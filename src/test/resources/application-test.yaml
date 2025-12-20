@@ -1,0 +1,3 @@
+app:
+  storage:
+    photos-dir: src/test/resources/test-tree-photos
