@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Farm Mapping</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+        html, body, #map { height: 100%; margin: 0; }
+    </style>
+</head>
+<body>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const map = L.map('map');
+
+    const minX = -851043.9790;
+    const maxX = -850541.3878;
+    const minY = 4893580.2088;
+    const maxY = 4894366.0692;
+
+    // EPSG:3857 meters -> LatLng
+    const southWest = L.Projection.SphericalMercator.unproject(L.point(minX, minY));
+    const northEast = L.Projection.SphericalMercator.unproject(L.point(maxX, maxY));
+    const bounds = L.latLngBounds(southWest, northEast);
+
+    // Fit map to your ortho and prevent panning away
+    map.fitBounds(bounds);
+    map.setMaxBounds(bounds);
+    map.options.maxBoundsViscosity = 1.0; // "hard" bounds feel
+
+
+    // Tiles served by Spring Boot from resources/static/tiles
+    L.tileLayer('/tiles/{z}/{x}/{y}.png', {
+        minZoom: 14,
+        maxZoom: 22,          // set to your generated max z
+        noWrap: true
+    }).addTo(map);
+
+    // Set initial view (replace with your land)
+    map.setView([40.2000, -7.5000], 18);
+
+    function iconFor(iconKey) {
+        return L.icon({
+            iconUrl: `/icons/${iconKey}.png`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        });
+    }
+
+    async function loadObservations() {
+        const res = await fetch('/api/observations'); // same origin => no CORS hassle
+        const data = await res.json();
+
+        for (const o of data) {
+            L.marker([o.lat, o.lon], { icon: iconFor(o.iconKey ?? 'unknown') })
+                .addTo(map)
+                .bindPopup(o.label ?? (o.iconKey ?? 'unknown'));
+        }
+    }
+
+    loadObservations().catch(console.error);
+</script>
+</body>
+</html>

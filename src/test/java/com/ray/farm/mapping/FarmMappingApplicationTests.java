@@ -1,32 +1,34 @@
 package com.ray.farm.mapping;
 
-import com.drew.imaging.ImageProcessingException;
-import com.ray.farm.mapping.service.photos.ExifReaderService;
-import com.ray.farm.mapping.service.photos.GeoRecord;
+import com.ray.farm.mapping.model.ItemGeoRecord;
+import com.ray.farm.mapping.service.ExifReaderService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-
-import java.io.IOException;
+import org.springframework.test.context.ActiveProfiles;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest(properties = {
         "app.storage.photoDir =./data/photos"
 })
+@ActiveProfiles("test")
 class FarmMappingApplicationTests {
 
-    @Autowired 
+    @Autowired
     private final ExifReaderService exifReaderService = null;
 
 
-	@Test
-	void checkGPSLibraryIsReadingGPSData() throws ImageProcessingException, IOException {
+    @Test
+    void extractsGpsFromPhoto() throws Exception {
 
-        GeoRecord record = exifReaderService.getExifData();
+        ItemGeoRecord record = exifReaderService.getExifData("tree1-with-location-data.jpg");
 
-        assertEquals(40.2004238, record.getLat());
-        assertEquals(-7.636439599999999, record.getLon());
-	}
+        double lat = record.getLocation().getCoordinate().getY();
+        double lon = record.getLocation().getCoordinate().getX();
+
+        assertEquals(40.2004238, lat, 1e-7);
+        assertEquals(-7.6364395, lon, 1e-7);
+    }
 
 }
