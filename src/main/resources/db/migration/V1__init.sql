@@ -10,6 +10,7 @@ CREATE TABLE observation (
 
     -- store the original image in DB (prototype approach)
                              image_bytes  bytea NOT NULL,
+                             tree_species      text NOT NULL,
 
     -- PostGIS point in WGS84
                              location     geometry(Point, 4326) NOT NULL

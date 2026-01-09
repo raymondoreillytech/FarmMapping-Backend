@@ -36,10 +36,15 @@ public class ObservationEntity {
     @Column(name = "location", columnDefinition = "geometry(Point,4326)", nullable = false)
     private Point location;
 
+    @Column(name = "tree_species")
+    private String treeSpecies;
+
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) createdAt = Instant.now();
     }
+
 
     // getters/setters
 }

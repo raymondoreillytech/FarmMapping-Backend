@@ -11,9 +11,25 @@
     />
     <style>
         html, body, #map { height: 100%; margin: 0; }
+
+        /* MINIMAL: small overlay button */
+        #editToggle {
+            position: absolute;
+            z-index: 1000;
+            top: 10px;
+            left: 10px;
+            background: rgba(255,255,255,0.95);
+            border: 1px solid #bbb;
+            border-radius: 6px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font: 14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        }
     </style>
 </head>
 <body>
+
+<button id="editToggle">Edit mode: OFF</button>
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -35,7 +51,6 @@
     map.setMaxBounds(bounds);
     map.options.maxBoundsViscosity = 1.0; // "hard" bounds feel
 
-
     // Tiles served by Spring Boot from resources/static/tiles
     L.tileLayer('/tiles/{z}/{x}/{y}.png', {
         minZoom: 14,
@@ -54,14 +69,72 @@
         });
     }
 
+    // MINIMAL: edit mode state + marker list
+    let editMode = false;
+    const markers = []; // store markers so we can enable/disable dragging
+
+    // MINIMAL: toggle button wiring
+    const editToggleBtn = document.getElementById('editToggle');
+    editToggleBtn.addEventListener('click', () => {
+        editMode = !editMode;
+        editToggleBtn.textContent = `Edit mode: ${editMode ? 'ON' : 'OFF'}`;
+
+        // Enable/disable dragging on existing markers
+        for (const m of markers) {
+            if (editMode) m.dragging.enable();
+            else m.dragging.disable();
+        }
+    });
+
+    // MINIMAL: PATCH helper
+    async function updateLocation(id, lat, lon) {
+        const res = await fetch(`/api/observations/${id}/location`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat, lon })
+        });
+        if (!res.ok) throw new Error(`PATCH failed: ${res.status}`);
+    }
+
     async function loadObservations() {
         const res = await fetch('/api/observations'); // same origin => no CORS hassle
         const data = await res.json();
 
         for (const o of data) {
-            L.marker([o.lat, o.lon], { icon: iconFor(o.iconKey ?? 'unknown') })
+            console.log("first observation", data[0]);
+            const marker = L.marker([o.lat, o.lon], {
+                icon: iconFor(o.iconKey ?? 'unknown'),
+                draggable: editMode // MINIMAL: draggable only in edit mode
+            })
                 .addTo(map)
                 .bindPopup(o.label ?? (o.iconKey ?? 'unknown'));
+
+            // MINIMAL: ensure drag is disabled when editMode is false
+            if (!editMode) marker.dragging.disable();
+
+            // MINIMAL: keep last saved position so we can revert on failure
+            let last = { lat: o.lat, lon: o.lon };
+
+            marker.on('dragend', async (e) => {
+                if (!editMode) return; // safety
+
+                const ll = e.target.getLatLng();
+                const newLat = ll.lat;
+                const newLon = ll.lng; // Leaflet uses lng for longitude
+
+                try {
+                    await updateLocation(o.id, newLat, newLon);
+                    last = { lat: newLat, lon: newLon };
+                    // optional: update popup text with new coords if you want
+                } catch (err) {
+                    console.error(err);
+                    // revert the marker if backend save failed
+                    e.target.setLatLng([last.lat, last.lon]);
+                    alert(`Failed to update location for id=${o.id}`);
+                }
+            });
+
+            markers.push(marker);
         }
     }
 

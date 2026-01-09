@@ -6,6 +6,7 @@ import com.drew.metadata.Metadata;
 import com.drew.metadata.exif.GpsDirectory;
 import com.ray.farm.mapping.controller.model.LeafletObservationDTO;
 import com.ray.farm.mapping.controller.model.PhotoSubmissionDTO;
+import com.ray.farm.mapping.model.TreeSpecies;
 import com.ray.farm.mapping.service.ExifReaderService;
 import com.ray.farm.mapping.service.TreePhotoProcessorService;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +29,7 @@ public class TreeObservationsController {
     private final ExifReaderService exifReaderService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<PhotoSubmissionDTO> create(@RequestPart("file") MultipartFile file) throws IOException, ImageProcessingException {
+    public ResponseEntity<PhotoSubmissionDTO> create(@RequestPart("file") MultipartFile file, @RequestParam TreeSpecies treeSpecies) throws IOException, ImageProcessingException {
 
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().build();
@@ -52,7 +53,8 @@ public class TreeObservationsController {
                 file.getSize(),
                 file.getBytes(),
                 lat,
-                lon
+                lon,
+                treeSpecies
         );
 
         PhotoSubmissionDTO saved = service.createFromPhoto(cmd); // saves observation to DB + extracts GPS, etc.
@@ -66,13 +68,30 @@ public class TreeObservationsController {
         return ResponseEntity.created(location).body(saved);
     }
 
+    @PatchMapping(path = "/{id}/location", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Void> updateLocation(@PathVariable long id,
+                                               @RequestBody LocationUpdateRequest body) {
+
+        double lat = body.lat();
+        double lon = body.lon();
+
+        // minimal validation (avoid NaN/Infinity + basic GPS range)
+        if (!Double.isFinite(lat) || !Double.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        service.updateObservationLocation(id, lat, lon); // implement in service
+        return ResponseEntity.noContent().build(); // 204
+    }
 
     @GetMapping
     public List<LeafletObservationDTO> observations() {
-        return List.of(
-                new LeafletObservationDTO(40.19210, -7.64230, "OakIcon", "Cork oak (0.82)"),
-                new LeafletObservationDTO(40.19300, -7.64190, "PineIcon", "Pine (0.74)")
-        );
+
+        return service.getAllObservations();
+    }
+
+    // minimal DTO (can be record)
+    public record LocationUpdateRequest(double lat, double lon) {
     }
 
 }

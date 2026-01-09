@@ -1,5 +1,6 @@
 services:
   db:
+    container_name: treemapper-db
     image: postgis/postgis:16-3.4
     environment:
       POSTGRES_DB: treemapper
