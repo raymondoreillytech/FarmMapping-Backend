@@ -15,7 +15,9 @@ public class ObservationUploadResource {
     private byte[] bytes;
 
 
-    public ObservationUploadResource(@Nullable String originalFilename, @Nullable String contentType, long size, byte[] bytes, double gpsLon, double gpsLat, TreeSpecies treeSpecies) {
+    public ObservationUploadResource(@Nullable String originalFilename, @Nullable String contentType, long size, byte[] bytes,
+                                     double gpsLat, double gpsLon, TreeSpecies treeSpecies) {
+
         this.originalFilename = originalFilename;
         this.contentType = contentType;
         this.size = size;
