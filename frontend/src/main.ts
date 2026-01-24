@@ -1,5 +1,6 @@
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import './style.css';
 
 type Observation = {
     id: number;
