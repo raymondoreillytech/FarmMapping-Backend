@@ -1,15 +1,38 @@
 services:
   db:
-    container_name: treemapper-db
+    container_name: farmmapping-db
     image: postgis/postgis:16-3.4
     environment:
-      POSTGRES_DB: treemapper
-      POSTGRES_USER: treemapper
-      POSTGRES_PASSWORD: treemapper
+      POSTGRES_DB: farmmapping
+      POSTGRES_USER: farmmapping
+      POSTGRES_PASSWORD: farmmapping
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U farmmapping -d farmmapping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    container_name: farmmapping-app
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/farmmapping
+      - SPRING_DATASOURCE_USERNAME=farmmapping
+      - SPRING_DATASOURCE_PASSWORD=farmmapping
+      - SPRING_FLYWAY_CONNECT_RETRIES=10
+      - SPRING_FLYWAY_ENABLED=true
+      - PHOTOS_DIR=/app/data/photos
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./data/photos:/app/data/photos
 
 volumes:
   pgdata:
