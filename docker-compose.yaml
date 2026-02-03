@@ -18,6 +18,11 @@ services:
 
   app:
     build: .
+    depends_on:
+      localstack:
+        condition: service_started
+      db:
+        condition: service_healthy
     container_name: farmmapping-app
     ports:
       - "8080:8080"
@@ -28,11 +33,20 @@ services:
       - SPRING_FLYWAY_CONNECT_RETRIES=10
       - SPRING_FLYWAY_ENABLED=true
       - PHOTOS_DIR=/app/data/photos
-    depends_on:
-      db:
-        condition: service_healthy
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=eu-west-1
+      - AWS_REGION=eu-west-1
+      - LOCALSTACK_ENDPOINT=http://localstack:4566
     volumes:
       - ./data/photos:/app/data/photos
+
+  localstack:
+    image: localstack/localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3
 
 volumes:
   pgdata:
