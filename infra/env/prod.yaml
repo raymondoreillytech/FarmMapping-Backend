@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Prod environment stack for FarmMapping.
+Parameters:
+  ObservationsBucketName:
+    Type: String
+    Description: Name of the observations S3 bucket.
+  EnableObservationsVersioning:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+    Description: Enable S3 versioning for observations.
+  BlockObservationsPublicAccess:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+    Description: Block all public access to the observations bucket.
+Conditions:
+  ObservationsVersioningEnabled: !Equals [!Ref EnableObservationsVersioning, "true"]
+  ObservationsBlockPublicAccessEnabled: !Equals [!Ref BlockObservationsPublicAccess, "true"]
+Resources:
+  ObservationsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref ObservationsBucketName
+      VersioningConfiguration: !If
+        - ObservationsVersioningEnabled
+        - Status: Enabled
+        - !Ref "AWS::NoValue"
+      PublicAccessBlockConfiguration: !If
+        - ObservationsBlockPublicAccessEnabled
+        - BlockPublicAcls: true
+          IgnorePublicAcls: true
+          BlockPublicPolicy: true
+          RestrictPublicBuckets: true
+        - !Ref "AWS::NoValue"
+      Tags:
+        - Key: Environment
+          Value: prod
+        - Key: Purpose
+          Value: observations
+Outputs:
+  ObservationsBucketName:
+    Value: !Ref ObservationsBucket
+  ObservationsBucketArn:
+    Value: !GetAtt ObservationsBucket.Arn

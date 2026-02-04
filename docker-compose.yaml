@@ -46,7 +46,33 @@ services:
     ports:
       - "4566:4566"
     environment:
-      - SERVICES=s3
+      - SERVICES=s3,cloudformation
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 40
+  infra:
+    image: amazon/aws-cli
+    depends_on:
+      localstack:
+        condition: service_healthy
+    volumes:
+      - ./infra:/infra:ro
+    environment:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=eu-west-1
+      - AWS_REGION=eu-west-1
+    entrypoint: /bin/sh -c
+    command: >
+      "ENDPOINT=http://localstack:4566;
+       if aws --endpoint-url=$ENDPOINT cloudformation describe-stacks --stack-name farmmapping-local >/dev/null 2>&1; then
+         aws --endpoint-url=$ENDPOINT cloudformation update-stack --stack-name farmmapping-local --template-body file:///infra/env/local.yaml --parameters file:///infra/env/params/local.json || echo 'no updates';
+       else
+         aws --endpoint-url=$ENDPOINT cloudformation create-stack --stack-name farmmapping-local --template-body file:///infra/env/local.yaml --parameters file:///infra/env/params/local.json;
+       fi;
+       echo 'infra ready'"
 
 volumes:
   pgdata:

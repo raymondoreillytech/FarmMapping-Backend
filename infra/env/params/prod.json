@@ -1,0 +1,14 @@
+[
+  {
+    "ParameterKey": "ObservationsBucketName",
+    "ParameterValue": "farmmapping-observations-prod"
+  },
+  {
+    "ParameterKey": "EnableObservationsVersioning",
+    "ParameterValue": "true"
+  },
+  {
+    "ParameterKey": "BlockObservationsPublicAccess",
+    "ParameterValue": "true"
+  }
+]
