@@ -19,7 +19,7 @@ public class TilesMetadataController {
                 15,
                 22,
                 bounds,
-                "/tiles/{z}/{x}/{y}.png"
+                "http://localstack:4566/map-tiles/{z}/{x}/{y}.png"
         );
     }
 }

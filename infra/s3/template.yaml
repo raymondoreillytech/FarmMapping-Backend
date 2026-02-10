@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: S3 bucket for FarmMapping observation assets used by the Leaflet map.
+Description: S3 bucket for FarmMapping map tiles used by the Leaflet map.
 Parameters:
   BucketName:
     Type: String
@@ -50,7 +50,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: Purpose
-          Value: observations
+          Value: map-tiles
 Outputs:
   BucketName:
     Value: !Ref ObservationsBucket

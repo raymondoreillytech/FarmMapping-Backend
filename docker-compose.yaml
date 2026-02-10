@@ -19,8 +19,8 @@ services:
   app:
     build: .
     depends_on:
-      localstack:
-        condition: service_started
+      infra:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
     container_name: farmmapping-app
@@ -66,11 +66,12 @@ services:
       - AWS_REGION=eu-west-1
     entrypoint: /bin/sh -c
     command: >
-      "ENDPOINT=http://localstack:4566;
-       if aws --endpoint-url=$ENDPOINT cloudformation describe-stacks --stack-name farmmapping-local >/dev/null 2>&1; then
-         aws --endpoint-url=$ENDPOINT cloudformation update-stack --stack-name farmmapping-local --template-body file:///infra/env/local.yaml --parameters file:///infra/env/params/local.json || echo 'no updates';
+      "set -e;
+       ENDPOINT=http://localstack:4566;
+       if aws --endpoint-url=$$ENDPOINT cloudformation describe-stacks --stack-name farmmapping-local >/dev/null 2>&1; then
+         aws --endpoint-url=$$ENDPOINT cloudformation update-stack --stack-name farmmapping-local --template-body file:///infra/env/local.yaml --parameters file:///infra/env/params/local.json || echo 'no updates';
        else
-         aws --endpoint-url=$ENDPOINT cloudformation create-stack --stack-name farmmapping-local --template-body file:///infra/env/local.yaml --parameters file:///infra/env/params/local.json;
+         aws --endpoint-url=$$ENDPOINT cloudformation create-stack --stack-name farmmapping-local --template-body file:///infra/env/local.yaml --parameters file:///infra/env/params/local.json;
        fi;
        echo 'infra ready'"
 

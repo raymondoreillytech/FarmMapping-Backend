@@ -41,7 +41,7 @@ Resources:
         - Key: Environment
           Value: prod
         - Key: Purpose
-          Value: observations
+          Value: map-tiles
 Outputs:
   ObservationsBucketName:
     Value: !Ref ObservationsBucket

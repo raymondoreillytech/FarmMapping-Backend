@@ -1,7 +1,7 @@
 [
   {
     "ParameterKey": "ObservationsBucketName",
-    "ParameterValue": "farmmapping-observations-local"
+    "ParameterValue": "farmmapping-map-tiles-local"
   },
   {
     "ParameterKey": "EnableObservationsVersioning",
