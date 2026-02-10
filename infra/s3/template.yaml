@@ -46,6 +46,18 @@ Resources:
           BlockPublicPolicy: true
           RestrictPublicBuckets: true
         - !Ref "AWS::NoValue"
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - "http://localhost:5173"
+            AllowedMethods:
+              - GET
+              - HEAD
+            AllowedHeaders:
+              - "*"
+            ExposedHeaders:
+              - ETag
+            MaxAge: 3000
       Tags:
         - Key: Environment
           Value: !Ref Environment
