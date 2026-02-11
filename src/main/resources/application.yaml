@@ -31,6 +31,8 @@ server:
 app:
   storage:
     photos-dir: ${PHOTOS_DIR:./data/photos}
+  tiles:
+    base-url: ${TILES_BASE_URL:http://localhost:4566/farmmapping-map-tiles-local}
   # Moving hardcoded tree species to configuration
   business-rules:
     allowed-species: ${ALLOWED_SPECIES:PINE,OAK,PLANE,PRICKLY_PEAR_CACTUS,EUCALYPTUS}
