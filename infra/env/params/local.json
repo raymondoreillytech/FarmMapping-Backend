@@ -1,14 +1,14 @@
 [
   {
-    "ParameterKey": "ObservationsBucketName",
+    "ParameterKey": "MapTilesBucketName",
     "ParameterValue": "farmmapping-map-tiles-local"
   },
   {
-    "ParameterKey": "EnableObservationsVersioning",
+    "ParameterKey": "EnableMapTilesVersioning",
     "ParameterValue": "false"
   },
   {
-    "ParameterKey": "BlockObservationsPublicAccess",
+    "ParameterKey": "BlockMapTilesPublicAccess",
     "ParameterValue": "false"
   }
 ]
