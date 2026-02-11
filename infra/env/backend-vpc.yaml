@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Exports default VPC and public subnets for backend stacks.
+
+Parameters:
+  AppName:
+    Type: String
+    Default: farmmapping
+    Description: Prefix for exported names.
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Default VPC id.
+  PublicSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Default VPC public subnet ids.
+
+Resources:
+  VpcExportsHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+
+Outputs:
+  VpcId:
+    Value: !Ref VpcId
+    Export:
+      Name: !Sub "${AppName}-vpc-id"
+  PublicSubnetIds:
+    Value: !Join [",", !Ref PublicSubnetIds]
+    Export:
+      Name: !Sub "${AppName}-public-subnet-ids"

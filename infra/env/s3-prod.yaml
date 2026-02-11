@@ -1,0 +1,164 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Prod S3 stack for FarmMapping.
+Parameters:
+  AppName:
+    Type: String
+    Default: farmmapping
+    Description: Prefix for exported names.
+  MapTilesBucketName:
+    Type: String
+    Default: farmmapping-map-tiles-prod
+    Description: Name of the map tiles S3 bucket.
+  SiteBucketName:
+    Type: String
+    Default: farmmapping-site-prod
+    Description: Name of the site S3 bucket.
+  CreateBucketPolicies:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+    Description: Create bucket policies after import.
+  EnableMapTilesVersioning:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+    Description: Enable S3 versioning for map tiles.
+  BlockMapTilesPublicAccess:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+    Description: Block all public access to the map tiles bucket.
+Conditions:
+  MapTilesVersioningEnabled: !Equals [!Ref EnableMapTilesVersioning, "true"]
+  MapTilesBlockPublicAccessEnabled: !Equals [!Ref BlockMapTilesPublicAccess, "true"]
+  BucketPoliciesEnabled: !Equals [!Ref CreateBucketPolicies, "true"]
+Resources:
+  MapTilesBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref MapTilesBucketName
+      VersioningConfiguration: !If
+        - MapTilesVersioningEnabled
+        - Status: Enabled
+        - !Ref "AWS::NoValue"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration: !If
+        - MapTilesBlockPublicAccessEnabled
+        - BlockPublicAcls: true
+          IgnorePublicAcls: true
+          BlockPublicPolicy: true
+          RestrictPublicBuckets: true
+        - !Ref "AWS::NoValue"
+      Tags:
+        - Key: Environment
+          Value: prod
+        - Key: Purpose
+          Value: map-tiles
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref SiteBucketName
+      VersioningConfiguration: !If
+        - MapTilesVersioningEnabled
+        - Status: Enabled
+        - !Ref "AWS::NoValue"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration: !If
+        - MapTilesBlockPublicAccessEnabled
+        - BlockPublicAcls: true
+          IgnorePublicAcls: true
+          BlockPublicPolicy: true
+          RestrictPublicBuckets: true
+        - !Ref "AWS::NoValue"
+      Tags:
+        - Key: Environment
+          Value: prod
+        - Key: Purpose
+          Value: site
+  MapTilesBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: BucketPoliciesEnabled
+    Properties:
+      Bucket: !Ref MapTilesBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontRead
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action:
+              - s3:GetObject
+            Resource: !Sub "${MapTilesBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub
+                  - "arn:aws:cloudfront::${AWS::AccountId}:distribution/${DistributionId}"
+                  - DistributionId: !ImportValue
+                      Fn::Sub: "${AppName}-cloudfront-dist-id"
+          - Sid: EnforceTLS
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt MapTilesBucket.Arn
+              - !Sub "${MapTilesBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: BucketPoliciesEnabled
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontRead
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action:
+              - s3:GetObject
+            Resource: !Sub "${SiteBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub
+                  - "arn:aws:cloudfront::${AWS::AccountId}:distribution/${DistributionId}"
+                  - DistributionId: !ImportValue
+                      Fn::Sub: "${AppName}-cloudfront-dist-id"
+          - Sid: EnforceTLS
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt SiteBucket.Arn
+              - !Sub "${SiteBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+Outputs:
+  MapTilesBucketName:
+    Value: !Ref MapTilesBucket
+  MapTilesBucketArn:
+    Value: !GetAtt MapTilesBucket.Arn
+  SiteBucketName:
+    Value: !Ref SiteBucket
+  SiteBucketArn:
+    Value: !GetAtt SiteBucket.Arn

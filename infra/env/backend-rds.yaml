@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: RDS Postgres for FarmMapping backend.
+
+Parameters:
+  AppName:
+    Type: String
+    Default: farmmapping
+    Description: Prefix for exported names.
+  DbName:
+    Type: String
+    Default: farmmapping
+    Description: Initial database name.
+  DbUsername:
+    Type: String
+    Default: farmmapping
+    Description: Database master username.
+  DbPassword:
+    Type: String
+    NoEcho: true
+    Description: Database master password.
+  DbInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+    Description: RDS instance class.
+  DbAllocatedStorage:
+    Type: Number
+    Default: 20
+    Description: RDS storage in GiB.
+  DbBackupRetentionDays:
+    Type: Number
+    Default: 0
+    Description: Backup retention in days (0 disables backups).
+
+Resources:
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Default VPC subnets for RDS.
+      SubnetIds: !Split
+        - ","
+        - !ImportValue
+          Fn::Sub: "${AppName}-public-subnet-ids"
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow ECS tasks to reach Postgres.
+      VpcId: !ImportValue
+        Fn::Sub: "${AppName}-vpc-id"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !ImportValue
+            Fn::Sub: "${AppName}-task-sg-id"
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  DbInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub "${AppName}-postgres"
+      Engine: postgres
+      DBInstanceClass: !Ref DbInstanceClass
+      AllocatedStorage: !Ref DbAllocatedStorage
+      StorageType: gp3
+      DBName: !Ref DbName
+      MasterUsername: !Ref DbUsername
+      MasterUserPassword: !Ref DbPassword
+      BackupRetentionPeriod: !Ref DbBackupRetentionDays
+      MultiAZ: false
+      PubliclyAccessible: false
+      VPCSecurityGroups:
+        - !Ref DbSecurityGroup
+      DBSubnetGroupName: !Ref DbSubnetGroup
+
+  DbUsernameParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${AppName}/db/username"
+      Type: String
+      Value: !Ref DbUsername
+
+  DbPasswordParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${AppName}/db/password"
+      Type: String
+      Value: !Ref DbPassword
+
+Outputs:
+  DbEndpoint:
+    Value: !GetAtt DbInstance.Endpoint.Address
+    Export:
+      Name: !Sub "${AppName}-db-endpoint"
+  DbPort:
+    Value: !GetAtt DbInstance.Endpoint.Port
+    Export:
+      Name: !Sub "${AppName}-db-port"
+  DbInstanceId:
+    Value: !Ref DbInstance
+    Export:
+      Name: !Sub "${AppName}-db-instance-id"
+  DbName:
+    Value: !Ref DbName
+    Export:
+      Name: !Sub "${AppName}-db-name"
+  DbUsernameParameterName:
+    Value: !Ref DbUsernameParameter
+    Export:
+      Name: !Sub "${AppName}-db-username-param"
+  DbPasswordParameterName:
+    Value: !Ref DbPasswordParameter
+    Export:
+      Name: !Sub "${AppName}-db-password-param"

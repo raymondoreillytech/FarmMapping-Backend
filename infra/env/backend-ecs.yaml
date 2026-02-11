@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ECS cluster and EC2 capacity for FarmMapping backend.
+
+Parameters:
+  AppName:
+    Type: String
+    Default: farmmapping
+    Description: Prefix for exported names.
+  ContainerPort:
+    Type: Number
+    Default: 8080
+    Description: Container port exposed by the Spring app.
+  EcsAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ecs/optimized-ami/amazon-linux-2/arm64/recommended/image_id
+    Description: ECS-optimized AMI for EC2 container instances.
+  EcsInstanceType:
+    Type: String
+    Default: t4g.micro
+    Description: EC2 instance type for the ECS cluster.
+  EcsDesiredCapacity:
+    Type: Number
+    Default: 1
+    Description: Number of ECS instances.
+
+Resources:
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${AppName}-cluster"
+
+  EcsInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+
+  EcsInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EcsInstanceRole
+
+  EcsInstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ECS instances.
+      VpcId: !ImportValue
+        Fn::Sub: "${AppName}-vpc-id"
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow ALB to reach ECS tasks.
+      VpcId: !ImportValue
+        Fn::Sub: "${AppName}-vpc-id"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ContainerPort
+          ToPort: !Ref ContainerPort
+          SourceSecurityGroupId: !ImportValue
+            Fn::Sub: "${AppName}-alb-sg-id"
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  EcsLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Ref EcsAmiId
+        InstanceType: !Ref EcsInstanceType
+        IamInstanceProfile:
+          Name: !Ref EcsInstanceProfile
+        SecurityGroupIds:
+          - !Ref EcsInstanceSecurityGroup
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            echo ECS_CLUSTER=${EcsCluster} >> /etc/ecs/ecs.config
+
+  EcsAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier: !Split
+        - ","
+        - !ImportValue
+          Fn::Sub: "${AppName}-public-subnet-ids"
+      MinSize: !Ref EcsDesiredCapacity
+      MaxSize: !Ref EcsDesiredCapacity
+      DesiredCapacity: !Ref EcsDesiredCapacity
+      LaunchTemplate:
+        LaunchTemplateId: !Ref EcsLaunchTemplate
+        Version: !GetAtt EcsLaunchTemplate.LatestVersionNumber
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-ecs"
+          PropagateAtLaunch: true
+
+Outputs:
+  EcsClusterName:
+    Value: !Ref EcsCluster
+    Export:
+      Name: !Sub "${AppName}-ecs-cluster-name"
+  AutoScalingGroupName:
+    Value: !Ref EcsAutoScalingGroup
+    Export:
+      Name: !Sub "${AppName}-ecs-asg-name"
+  TaskSecurityGroupId:
+    Value: !Ref TaskSecurityGroup
+    Export:
+      Name: !Sub "${AppName}-task-sg-id"

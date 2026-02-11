@@ -1,0 +1,153 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFront distribution for FarmMapping site (prod).
+
+Parameters:
+  AppName:
+    Type: String
+    Default: farmmapping
+    Description: Prefix for exported names.
+  SiteBucketName:
+    Type: String
+    Default: farmmapping-site-prod
+    Description: S3 bucket name for the site origin.
+  MapTilesBucketName:
+    Type: String
+    Default: farmmapping-map-tiles-prod
+    Description: S3 bucket name for the map tiles origin.
+  DistributionEnabled:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "false"
+    Description: Whether the distribution is enabled.
+  EnableMapTilesOrigin:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "false"
+    Description: Add the map tiles origin and cache behavior.
+  EnableApiOrigin:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+    Description: Add the API origin and /api/* cache behavior.
+
+Conditions:
+  DistributionEnabledCond: !Equals [!Ref DistributionEnabled, "true"]
+  MapTilesOriginEnabled: !Equals [!Ref EnableMapTilesOrigin, "true"]
+  ApiOriginEnabled: !Equals [!Ref EnableApiOrigin, "true"]
+  HasCacheBehaviors: !Or
+    - !Condition MapTilesOriginEnabled
+    - !Condition ApiOriginEnabled
+
+Resources:
+  SiteOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      OriginAccessControlConfig:
+        Name: farmmapping-site-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  SiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    DeletionPolicy: Retain
+    Properties:
+      DistributionConfig:
+        Comment: FarmMapping site + map tiles CDN
+        Enabled: !If [DistributionEnabledCond, true, false]
+        HttpVersion: http2
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: SiteS3Origin
+            DomainName: !Sub "${SiteBucketName}.s3.${AWS::Region}.amazonaws.com"
+            OriginAccessControlId: !Ref SiteOriginAccessControl
+            S3OriginConfig: {}
+          - !If
+            - ApiOriginEnabled
+            - Id: ApiAlbOrigin
+              DomainName: !ImportValue
+                Fn::Sub: "${AppName}-alb-dns"
+              CustomOriginConfig:
+                OriginProtocolPolicy: http-only
+                HTTPPort: 80
+            - !Ref "AWS::NoValue"
+          - !If
+            - MapTilesOriginEnabled
+            - Id: MapTilesS3Origin
+              DomainName: !Sub "${MapTilesBucketName}.s3.${AWS::Region}.amazonaws.com"
+              OriginAccessControlId: !Ref SiteOriginAccessControl
+              S3OriginConfig: {}
+            - !Ref "AWS::NoValue"
+        DefaultCacheBehavior:
+          TargetOriginId: SiteS3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
+            - GET
+            - HEAD
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          Compress: true
+        CacheBehaviors: !If
+          - HasCacheBehaviors
+          - - !If
+              - ApiOriginEnabled
+              - PathPattern: /api/*
+                TargetOriginId: ApiAlbOrigin
+                ViewerProtocolPolicy: redirect-to-https
+                AllowedMethods:
+                  - GET
+                  - HEAD
+                  - OPTIONS
+                  - PUT
+                  - POST
+                  - PATCH
+                  - DELETE
+                CachedMethods:
+                  - GET
+                  - HEAD
+                CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+                OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3
+                Compress: true
+              - !Ref "AWS::NoValue"
+            - !If
+              - MapTilesOriginEnabled
+              - PathPattern: /tiles/*
+                TargetOriginId: MapTilesS3Origin
+                ViewerProtocolPolicy: redirect-to-https
+                AllowedMethods:
+                  - GET
+                  - HEAD
+                CachedMethods:
+                  - GET
+                  - HEAD
+                CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+                Compress: true
+              - !Ref "AWS::NoValue"
+          - !Ref "AWS::NoValue"
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+        DefaultRootObject: index.html
+
+Outputs:
+  SiteDistributionId:
+    Value: !Ref SiteDistribution
+    Export:
+      Name: !Sub "${AppName}-cloudfront-dist-id"
+  SiteDistributionArn:
+    Value: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}"
+    Export:
+      Name: !Sub "${AppName}-cloudfront-dist-arn"
+  SiteDistributionDomainName:
+    Value: !GetAtt SiteDistribution.DomainName
+    Export:
+      Name: !Sub "${AppName}-cloudfront-dist-domain"

@@ -1,0 +1,177 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ECS service and task definition for FarmMapping backend.
+
+Parameters:
+  AppName:
+    Type: String
+    Default: farmmapping
+    Description: Prefix for exported names.
+  AppImageTag:
+    Type: String
+    Default: latest
+    Description: ECR image tag for the backend container.
+  EcrRepositoryName:
+    Type: String
+    Default: farmmapping-backend
+    Description: ECR repository name for the backend image.
+  ContainerPort:
+    Type: Number
+    Default: 8080
+    Description: Container port exposed by the Spring app.
+  AppDesiredCount:
+    Type: Number
+    Default: 0
+    Description: Number of running tasks.
+  AppCpu:
+    Type: String
+    Default: "256"
+    Description: Task CPU units.
+  AppMemory:
+    Type: String
+    Default: "512"
+    Description: Task memory (MiB).
+  HealthCheckGracePeriodSeconds:
+    Type: Number
+    Default: 180
+    Description: Grace period for ALB health checks.
+  LogRetentionDays:
+    Type: Number
+    Default: 1
+    Description: CloudWatch log retention in days.
+
+Resources:
+  EcrRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref EcrRepositoryName
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Retain only the last 5 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  AppLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${AppName}"
+      RetentionInDays: !Ref LogRetentionDays
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: ssm-parameter-read
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameters
+                Resource:
+                  - !Sub
+                    - "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${DbUsernameParam}"
+                    - DbUsernameParam: !ImportValue
+                        Fn::Sub: "${AppName}-db-username-param"
+                  - !Sub
+                    - "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${DbPasswordParam}"
+                    - DbPasswordParam: !ImportValue
+                        Fn::Sub: "${AppName}-db-password-param"
+
+  AppTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${AppName}-task"
+      RequiresCompatibilities:
+        - EC2
+      NetworkMode: awsvpc
+      Cpu: !Ref AppCpu
+      Memory: !Ref AppMemory
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      ContainerDefinitions:
+        - Name: app
+          Image: !Sub "${EcrRepository.RepositoryUri}:${AppImageTag}"
+          PortMappings:
+            - ContainerPort: !Ref ContainerPort
+          Environment:
+            - Name: SPRING_DATASOURCE_URL
+              Value: !Sub
+                - "jdbc:postgresql://${DbHost}:${DbPort}/${DbName}"
+                - DbHost: !ImportValue
+                    Fn::Sub: "${AppName}-db-endpoint"
+                  DbPort: !ImportValue
+                    Fn::Sub: "${AppName}-db-port"
+                  DbName: !ImportValue
+                    Fn::Sub: "${AppName}-db-name"
+            - Name: TILES_BASE_URL
+              Value: /tiles
+          Secrets:
+            - Name: SPRING_DATASOURCE_USERNAME
+              ValueFrom: !ImportValue
+                Fn::Sub: "${AppName}-db-username-param"
+            - Name: SPRING_DATASOURCE_PASSWORD
+              ValueFrom: !ImportValue
+                Fn::Sub: "${AppName}-db-password-param"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref AppLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+
+  AppService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !ImportValue
+        Fn::Sub: "${AppName}-ecs-cluster-name"
+      DesiredCount: !Ref AppDesiredCount
+      LaunchType: EC2
+      TaskDefinition: !Ref AppTaskDefinition
+      HealthCheckGracePeriodSeconds: !Ref HealthCheckGracePeriodSeconds
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets: !Split
+            - ","
+            - !ImportValue
+              Fn::Sub: "${AppName}-public-subnet-ids"
+          SecurityGroups:
+            - !ImportValue
+              Fn::Sub: "${AppName}-task-sg-id"
+      LoadBalancers:
+        - ContainerName: app
+          ContainerPort: !Ref ContainerPort
+          TargetGroupArn: !ImportValue
+            Fn::Sub: "${AppName}-tg-arn"
+
+Outputs:
+  EcrRepositoryUri:
+    Value: !GetAtt EcrRepository.RepositoryUri
+    Export:
+      Name: !Sub "${AppName}-ecr-repo-uri"
+  EcsServiceName:
+    Value: !Ref AppService
+    Export:
+      Name: !Sub "${AppName}-ecs-service-name"

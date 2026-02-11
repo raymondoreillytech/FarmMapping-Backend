@@ -1,0 +1,121 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Scheduled stop for ECS/ASG/RDS to reduce costs.
+
+Parameters:
+  AppName:
+    Type: String
+    Default: farmmapping
+    Description: Prefix for exported names.
+  StopScheduleExpression:
+    Type: String
+    Default: cron(0 0 * * ? *)
+    Description: Cron expression for stop time (UTC by default).
+
+Resources:
+  StopperRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: stop-backend-resources
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecs:UpdateService
+                Resource: !Sub
+                  - "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:service/${ClusterName}/${ServiceName}"
+                  - ClusterName: !ImportValue
+                      Fn::Sub: "${AppName}-ecs-cluster-name"
+                    ServiceName: !ImportValue
+                      Fn::Sub: "${AppName}-ecs-service-name"
+              - Effect: Allow
+                Action:
+                  - autoscaling:UpdateAutoScalingGroup
+                Resource: !Sub
+                  - "arn:aws:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/${AsgName}"
+                  - AsgName: !ImportValue
+                      Fn::Sub: "${AppName}-ecs-asg-name"
+              - Effect: Allow
+                Action:
+                  - rds:StopDBInstance
+                Resource: !Sub
+                  - "arn:aws:rds:${AWS::Region}:${AWS::AccountId}:db:${DbId}"
+                  - DbId: !ImportValue
+                      Fn::Sub: "${AppName}-db-instance-id"
+
+  StopperFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AppName}-stopper"
+      Role: !GetAtt StopperRole.Arn
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 60
+      Environment:
+        Variables:
+          ECS_CLUSTER: !ImportValue
+            Fn::Sub: "${AppName}-ecs-cluster-name"
+          ECS_SERVICE: !ImportValue
+            Fn::Sub: "${AppName}-ecs-service-name"
+          ASG_NAME: !ImportValue
+            Fn::Sub: "${AppName}-ecs-asg-name"
+          DB_INSTANCE_ID: !ImportValue
+            Fn::Sub: "${AppName}-db-instance-id"
+      Code:
+        ZipFile: |
+          import boto3
+          import os
+
+          def handler(event, context):
+              ecs = boto3.client("ecs")
+              asg = boto3.client("autoscaling")
+              rds = boto3.client("rds")
+
+              cluster = os.environ["ECS_CLUSTER"]
+              service = os.environ["ECS_SERVICE"]
+              asg_name = os.environ["ASG_NAME"]
+              db_id = os.environ["DB_INSTANCE_ID"]
+
+              ecs.update_service(cluster=cluster, service=service, desiredCount=0)
+              asg.update_auto_scaling_group(
+                  AutoScalingGroupName=asg_name,
+                  MinSize=0,
+                  MaxSize=0,
+                  DesiredCapacity=0,
+              )
+              rds.stop_db_instance(DBInstanceIdentifier=db_id)
+
+              return {"status": "stopped"}
+
+  StopScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: !Ref StopScheduleExpression
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StopperFunction.Arn
+          Id: StopperFunction
+
+  AllowEventsInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StopperFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StopScheduleRule.Arn
+
+Outputs:
+  StopperFunctionName:
+    Value: !Ref StopperFunction
+  StopScheduleRuleArn:
+    Value: !GetAtt StopScheduleRule.Arn
