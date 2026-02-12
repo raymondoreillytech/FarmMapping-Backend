@@ -26,7 +26,7 @@ public class TilesMetadataController {
                 -850562.586871834, 4894133.9336146
         );
 
-        var tileUrlTemplate = tilesBaseUrl + "/v" + version + "/{z}/{x}/{y}.png";
+        var tileUrlTemplate = tilesBaseUrl + "/v" + version + "/{z}/{x}/{y}.jpg";
 
         return new TileMetadataDto(
                 15,

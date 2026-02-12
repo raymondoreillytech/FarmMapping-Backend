@@ -23,7 +23,7 @@ echo "  tile dir: $TILE_DIR"
 aws --profile "$PROFILE" --region "$REGION" s3 sync \
   "$TILE_DIR" "s3://$BUCKET" \
   --exclude "*" \
-  --include "*.png" \
+  --include "*.jpg" \
   --only-show-errors
 
 echo "Done."
