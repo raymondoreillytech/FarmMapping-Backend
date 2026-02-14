@@ -29,7 +29,7 @@ public class TilesMetadataController {
         var tileUrlTemplate = tilesBaseUrl + "/v" + version + "/{z}/{x}/{y}.jpg";
 
         return new TileMetadataDto(
-                15,
+                17,
                 23,
                 bounds,
                 tileUrlTemplate
