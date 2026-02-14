@@ -32,8 +32,8 @@ Parameters:
     Description: Task memory (MiB).
   HealthCheckGracePeriodSeconds:
     Type: Number
-    Default: 180
-    Description: Grace period for ALB health checks.
+    Default: 300
+    Description: Grace period for ALB health checks during task startup.
   LogRetentionDays:
     Type: Number
     Default: 1

@@ -14,6 +14,22 @@ Parameters:
     Type: String
     Default: /actuator/health
     Description: Health check path for the target group.
+  HealthCheckIntervalSeconds:
+    Type: Number
+    Default: 30
+    Description: Seconds between target group health checks.
+  HealthCheckTimeoutSeconds:
+    Type: Number
+    Default: 10
+    Description: Health check timeout in seconds.
+  HealthyThresholdCount:
+    Type: Number
+    Default: 2
+    Description: Number of consecutive successes before marking healthy.
+  UnhealthyThresholdCount:
+    Type: Number
+    Default: 5
+    Description: Number of consecutive failures before marking unhealthy.
   AlbIngressCidr:
     Type: String
     Default: 0.0.0.0/0
@@ -57,7 +73,13 @@ Resources:
       Port: !Ref ContainerPort
       Protocol: HTTP
       TargetType: ip
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: traffic-port
       HealthCheckPath: !Ref HealthCheckPath
+      HealthCheckIntervalSeconds: !Ref HealthCheckIntervalSeconds
+      HealthCheckTimeoutSeconds: !Ref HealthCheckTimeoutSeconds
+      HealthyThresholdCount: !Ref HealthyThresholdCount
+      UnhealthyThresholdCount: !Ref UnhealthyThresholdCount
       Matcher:
         HttpCode: 200-399
 
