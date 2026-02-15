@@ -158,7 +158,18 @@
         "logs:DeleteLogGroup",
         "logs:PutRetentionPolicy",
         "logs:DescribeLogGroups",
-        "logs:DescribeIndexPolicies"
+        "logs:DescribeIndexPolicies",
+        "logs:DescribeLogStreams",
+        "logs:FilterLogEvents",
+        "logs:GetLogEvents"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudWatchRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:GetMetricStatistics"
       ],
       "Resource": "*"
     },

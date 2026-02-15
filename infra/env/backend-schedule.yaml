@@ -32,12 +32,8 @@ Resources:
               - Effect: Allow
                 Action:
                   - ecs:UpdateService
-                Resource: !Sub
-                  - "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:service/${ClusterName}/${ServiceName}"
-                  - ClusterName: !ImportValue
-                      Fn::Sub: "${AppName}-ecs-cluster-name"
-                    ServiceName: !ImportValue
-                      Fn::Sub: "${AppName}-ecs-service-name"
+                Resource: !ImportValue
+                  Fn::Sub: "${AppName}-ecs-service-name"
               - Effect: Allow
                 Action:
                   - autoscaling:UpdateAutoScalingGroup
