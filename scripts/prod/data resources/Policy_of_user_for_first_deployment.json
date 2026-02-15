@@ -284,6 +284,14 @@
       "Resource": "*"
     },
     {
+      "Sid": "AcmRead",
+      "Effect": "Allow",
+      "Action": [
+        "acm:ListCertificates"
+      ],
+      "Resource": "*"
+    },
+    {
       "Sid": "StaticSite",
       "Effect": "Allow",
       "Action": [

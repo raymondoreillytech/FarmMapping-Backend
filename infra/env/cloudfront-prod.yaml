@@ -46,12 +46,36 @@ Parameters:
       - "false"
     Default: "true"
     Description: Add the API origin and /api/* cache behavior.
+  ViewerCertificateArn:
+    Type: String
+    Default: ""
+    Description: ACM certificate ARN in us-east-1 for custom domains. Leave empty to use default CloudFront cert.
+  ApexDomainName:
+    Type: String
+    Default: ""
+    Description: Apex domain alias (example.com). Leave empty to skip alias.
+  WwwDomainName:
+    Type: String
+    Default: ""
+    Description: WWW alias (www.example.com). Leave empty to skip alias.
 
 Conditions:
   DistributionEnabledCond: !Equals [!Ref DistributionEnabled, "true"]
   MapTilesOriginEnabled: !Equals [!Ref EnableMapTilesOrigin, "true"]
   IconsOriginEnabled: !Equals [!Ref EnableIconsOrigin, "true"]
   ApiOriginEnabled: !Equals [!Ref EnableApiOrigin, "true"]
+  HasViewerCertificateArn: !Not [!Equals [!Ref ViewerCertificateArn, ""]]
+  HasApexDomain: !Not [!Equals [!Ref ApexDomainName, ""]]
+  HasWwwDomain: !Not [!Equals [!Ref WwwDomainName, ""]]
+  HasApexAlias: !And
+    - !Condition HasViewerCertificateArn
+    - !Condition HasApexDomain
+  HasWwwAlias: !And
+    - !Condition HasViewerCertificateArn
+    - !Condition HasWwwDomain
+  HasAnyAlias: !Or
+    - !Condition HasApexAlias
+    - !Condition HasWwwAlias
   HasCacheBehaviors: !Or
     - !Condition MapTilesOriginEnabled
     - !Condition IconsOriginEnabled
@@ -78,6 +102,11 @@ Resources:
         Enabled: !If [DistributionEnabledCond, true, false]
         HttpVersion: http2
         PriceClass: PriceClass_100
+        Aliases: !If
+          - HasAnyAlias
+          - - !If [HasApexAlias, !Ref ApexDomainName, !Ref "AWS::NoValue"]
+            - !If [HasWwwAlias, !Ref WwwDomainName, !Ref "AWS::NoValue"]
+          - !Ref "AWS::NoValue"
         Origins:
           - Id: SiteS3Origin
             DomainName: !Sub "${SiteBucketName}.s3.${AWS::Region}.amazonaws.com"
@@ -169,7 +198,12 @@ Resources:
               - !Ref "AWS::NoValue"
           - !Ref "AWS::NoValue"
         ViewerCertificate:
-          CloudFrontDefaultCertificate: true
+          !If
+            - HasViewerCertificateArn
+            - AcmCertificateArn: !Ref ViewerCertificateArn
+              SslSupportMethod: sni-only
+              MinimumProtocolVersion: TLSv1.2_2021
+            - CloudFrontDefaultCertificate: true
         DefaultRootObject: index.html
 
 Outputs:
