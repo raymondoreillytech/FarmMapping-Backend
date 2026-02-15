@@ -150,6 +150,10 @@ Resources:
       DesiredCount: !Ref AppDesiredCount
       LaunchType: EC2
       TaskDefinition: !Ref AppTaskDefinition
+      AvailabilityZoneRebalancing: DISABLED
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
       HealthCheckGracePeriodSeconds: !Ref HealthCheckGracePeriodSeconds
       NetworkConfiguration:
         AwsvpcConfiguration:
