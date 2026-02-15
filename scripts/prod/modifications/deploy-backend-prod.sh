@@ -94,6 +94,7 @@ deploy_stack() {
 }
 
 deploy_stack "farmmapping-cloudfront-prod" "infra/env/cloudfront-prod.yaml"
+deploy_stack "farmmapping-icons-prod" "infra/env/icons-prod.yaml"
 deploy_stack "farmmapping-s3-prod" "infra/env/s3-prod.yaml"
 deploy_stack "farmmapping-backend-vpc" "infra/env/backend-vpc.yaml" "infra/env/params/backend-vpc.json"
 deploy_stack "farmmapping-backend-alb" "infra/env/backend-alb.yaml"

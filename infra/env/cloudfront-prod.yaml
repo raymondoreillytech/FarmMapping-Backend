@@ -14,6 +14,10 @@ Parameters:
     Type: String
     Default: farmmapping-map-tiles-prod
     Description: S3 bucket name for the map tiles origin.
+  IconsBucketName:
+    Type: String
+    Default: farmmapping-icons-prod
+    Description: S3 bucket name for the icons origin.
   DistributionEnabled:
     Type: String
     AllowedValues:
@@ -28,6 +32,13 @@ Parameters:
       - "false"
     Default: "false"
     Description: Add the map tiles origin and cache behavior.
+  EnableIconsOrigin:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+    Description: Add the icons origin and /icons/* cache behavior.
   EnableApiOrigin:
     Type: String
     AllowedValues:
@@ -39,9 +50,11 @@ Parameters:
 Conditions:
   DistributionEnabledCond: !Equals [!Ref DistributionEnabled, "true"]
   MapTilesOriginEnabled: !Equals [!Ref EnableMapTilesOrigin, "true"]
+  IconsOriginEnabled: !Equals [!Ref EnableIconsOrigin, "true"]
   ApiOriginEnabled: !Equals [!Ref EnableApiOrigin, "true"]
   HasCacheBehaviors: !Or
     - !Condition MapTilesOriginEnabled
+    - !Condition IconsOriginEnabled
     - !Condition ApiOriginEnabled
 
 Resources:
@@ -61,7 +74,7 @@ Resources:
     DeletionPolicy: Retain
     Properties:
       DistributionConfig:
-        Comment: FarmMapping site + map tiles CDN
+        Comment: FarmMapping site + map tiles + icons CDN
         Enabled: !If [DistributionEnabledCond, true, false]
         HttpVersion: http2
         PriceClass: PriceClass_100
@@ -83,6 +96,13 @@ Resources:
             - MapTilesOriginEnabled
             - Id: MapTilesS3Origin
               DomainName: !Sub "${MapTilesBucketName}.s3.${AWS::Region}.amazonaws.com"
+              OriginAccessControlId: !Ref SiteOriginAccessControl
+              S3OriginConfig: {}
+            - !Ref "AWS::NoValue"
+          - !If
+            - IconsOriginEnabled
+            - Id: IconsS3Origin
+              DomainName: !Sub "${IconsBucketName}.s3.${AWS::Region}.amazonaws.com"
               OriginAccessControlId: !Ref SiteOriginAccessControl
               S3OriginConfig: {}
             - !Ref "AWS::NoValue"
@@ -123,6 +143,20 @@ Resources:
               - MapTilesOriginEnabled
               - PathPattern: /tiles/*
                 TargetOriginId: MapTilesS3Origin
+                ViewerProtocolPolicy: redirect-to-https
+                AllowedMethods:
+                  - GET
+                  - HEAD
+                CachedMethods:
+                  - GET
+                  - HEAD
+                CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+                Compress: true
+              - !Ref "AWS::NoValue"
+            - !If
+              - IconsOriginEnabled
+              - PathPattern: /icons/*
+                TargetOriginId: IconsS3Origin
                 ViewerProtocolPolicy: redirect-to-https
                 AllowedMethods:
                   - GET

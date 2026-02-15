@@ -11,6 +11,7 @@ stacks=(
   "farmmapping-backend-rds"
   "farmmapping-backend-app"
   "farmmapping-backend-schedule"
+  "farmmapping-icons-prod"
 )
 
 fail=0
