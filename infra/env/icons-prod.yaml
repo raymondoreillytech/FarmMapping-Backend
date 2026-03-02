@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Prod S3 stack for FarmMapping icons.
+
+Parameters:
+  AppName:
+    Type: String
+    Default: farmmapping
+    Description: Prefix for exported names.
+  IconsBucketName:
+    Type: String
+    Default: farmmapping-icons-prod
+    Description: Name of the icons S3 bucket.
+  CreateBucketPolicy:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+    Description: Create bucket policy after CloudFront stack exists.
+  EnableIconsVersioning:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+    Description: Enable S3 versioning for icons.
+  BlockIconsPublicAccess:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+    Description: Block all public access to the icons bucket.
+
+Conditions:
+  IconsVersioningEnabled: !Equals [!Ref EnableIconsVersioning, "true"]
+  IconsBlockPublicAccessEnabled: !Equals [!Ref BlockIconsPublicAccess, "true"]
+  BucketPolicyEnabled: !Equals [!Ref CreateBucketPolicy, "true"]
+
+Resources:
+  IconsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref IconsBucketName
+      VersioningConfiguration: !If
+        - IconsVersioningEnabled
+        - Status: Enabled
+        - !Ref "AWS::NoValue"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration: !If
+        - IconsBlockPublicAccessEnabled
+        - BlockPublicAcls: true
+          IgnorePublicAcls: true
+          BlockPublicPolicy: true
+          RestrictPublicBuckets: true
+        - !Ref "AWS::NoValue"
+      Tags:
+        - Key: Environment
+          Value: prod
+        - Key: Purpose
+          Value: icons
+
+  IconsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: BucketPolicyEnabled
+    Properties:
+      Bucket: !Ref IconsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontRead
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action:
+              - s3:GetObject
+            Resource: !Sub "${IconsBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub
+                  - "arn:aws:cloudfront::${AWS::AccountId}:distribution/${DistributionId}"
+                  - DistributionId: !ImportValue
+                      Fn::Sub: "${AppName}-cloudfront-dist-id"
+          - Sid: EnforceTLS
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt IconsBucket.Arn
+              - !Sub "${IconsBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+
+Outputs:
+  IconsBucketName:
+    Value: !Ref IconsBucket
+    Export:
+      Name: !Sub "${AppName}-icons-bucket-name"
+  IconsBucketArn:
+    Value: !GetAtt IconsBucket.Arn
+    Export:
+      Name: !Sub "${AppName}-icons-bucket-arn"
