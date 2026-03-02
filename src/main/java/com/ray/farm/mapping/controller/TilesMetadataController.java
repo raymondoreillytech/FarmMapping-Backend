@@ -19,7 +19,7 @@ public class TilesMetadataController {
     }
 
     @GetMapping("/api/tiles/metadata")
-    public TileMetadataDto metadata(@RequestParam @Min(1) int version) {
+    public TileMetadataDto metadata(@RequestParam @Min(0) int version) {
 
         var bounds = new TileMetadataDto.Bounds3857(
                 -850982.990527403, 4893579.76515953,
