@@ -1,0 +1,22 @@
+[
+  {
+    "ParameterKey": "DistributionEnabled",
+    "ParameterValue": "true"
+  },
+  {
+    "ParameterKey": "EnableMapTilesOrigin",
+    "ParameterValue": "true"
+  },
+  {
+    "ParameterKey": "ViewerCertificateArn",
+    "ParameterValue": "arn:aws:acm:us-east-1:507629157695:certificate/8e718652-7d0c-4d7f-8aa5-8eabf67d94ea"
+  },
+  {
+    "ParameterKey": "ApexDomainName",
+    "ParameterValue": "centroaguasvivas.com"
+  },
+  {
+    "ParameterKey": "WwwDomainName",
+    "ParameterValue": "www.centroaguasvivas.com"
+  }
+]
