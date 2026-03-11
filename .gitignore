@@ -33,3 +33,4 @@ build/
 .vscode/
 /static/basemaps/tiles/
 infra/env/params/backend-rds.local.json
+/temp/

@@ -1,0 +1,19 @@
+{
+  "model_version": "sweep_20260310_232455-resnet34_full_cosine_bs40_90ep",
+  "backbone": "resnet34",
+  "unknown_confidence_threshold": 0.75,
+  "source_model_directory": "C:/Users/msn_r/PycharmProjects/FarmMapping-ML/models/night_sweep/sweep_20260310_232455/resnet34_full_cosine_bs40_90ep",
+  "promoted_on": "2026-03-11",
+  "class_names": [
+    "alder",
+    "ash",
+    "atlas_cedar",
+    "maritime_pine",
+    "med_cypress",
+    "medronheiro",
+    "oak",
+    "olive",
+    "stone_pine",
+    "white_willow"
+  ]
+}

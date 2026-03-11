@@ -23,7 +23,9 @@
         "cloudformation:DetectStackDrift",
         "cloudformation:DetectStackResourceDrift",
         "cloudformation:DescribeStackDriftDetectionStatus",
-        "cloudformation:DescribeStackResourceDrifts"
+        "cloudformation:DescribeStackResourceDrifts",
+        "cloudformation:ContinueUpdateRollback"
+
       ],
       "Resource": "*"
     },
@@ -77,9 +79,11 @@
         "autoscaling:DescribeAutoScalingGroups",
         "autoscaling:DescribeAutoScalingInstances",
         "autoscaling:DescribeLifecycleHooks",
+        "autoscaling:DescribeScalingActivities",
         "autoscaling:DescribeNotificationConfigurations",
         "autoscaling:CreateOrUpdateTags",
         "autoscaling:DeleteTags"
+
       ],
       "Resource": "*"
     },

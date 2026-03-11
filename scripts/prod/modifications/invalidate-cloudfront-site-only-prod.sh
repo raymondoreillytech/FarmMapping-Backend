@@ -19,7 +19,7 @@ else
   exit 2
 fi
 
-paths=("/index.html" "/assets/*")
+paths=("/*")
 if [[ -n "${PATHS:-}" ]]; then
   read -r -a paths <<< "${PATHS}"
 fi

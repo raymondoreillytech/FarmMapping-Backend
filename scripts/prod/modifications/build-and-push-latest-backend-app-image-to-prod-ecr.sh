@@ -3,20 +3,29 @@ set -euo pipefail
 
 PROFILE="${PROFILE:-prod}"
 REGION="${REGION:-eu-west-1}"
-PLATFORM="${PLATFORM:-linux/arm64}"
+PLATFORM="${PLATFORM:-linux/amd64}"
 TAG="${IMAGE_TAG:-latest}"
 
-repo="$(aws --profile "$PROFILE" --region "$REGION" cloudformation describe-stacks \
+app_repo="$(aws --profile "$PROFILE" --region "$REGION" cloudformation describe-stacks \
   --stack-name farmmapping-backend-app \
   --query "Stacks[0].Outputs[?OutputKey=='EcrRepositoryUri'].OutputValue" \
   --output text)"
+inference_repo="$(aws --profile "$PROFILE" --region "$REGION" cloudformation describe-stacks \
+  --stack-name farmmapping-backend-app \
+  --query "Stacks[0].Outputs[?OutputKey=='InferenceEcrRepositoryUri'].OutputValue" \
+  --output text)"
 
-if [[ -z "$repo" || "$repo" == "None" ]]; then
-  echo "ECR repo URI not found. Is farmmapping-backend-app stack deployed?"
+if [[ -z "$app_repo" || "$app_repo" == "None" ]]; then
+  echo "Backend ECR repo URI not found. Is farmmapping-backend-app stack deployed?"
   exit 1
 fi
 
-registry="${repo%%/*}"
+if [[ -z "$inference_repo" || "$inference_repo" == "None" ]]; then
+  echo "Inference ECR repo URI not found. Is farmmapping-backend-app stack deployed?"
+  exit 1
+fi
+
+registry="${app_repo%%/*}"
 
 echo "Logging into ECR $registry..."
 aws --profile "$PROFILE" --region "$REGION" ecr get-login-password | \
@@ -25,8 +34,11 @@ aws --profile "$PROFILE" --region "$REGION" ecr get-login-password | \
 echo "Building JAR..."
 ./mvnw clean package -DskipTests
 
-echo "Building and pushing image to $repo:$TAG ($PLATFORM)..."
-docker buildx build --platform "$PLATFORM" -t "$repo:$TAG" --push .
+echo "Building and pushing backend image to $app_repo:$TAG ($PLATFORM)..."
+docker buildx build --platform "$PLATFORM" -t "$app_repo:$TAG" --push .
+
+echo "Building and pushing inference image to $inference_repo:$TAG ($PLATFORM)..."
+docker buildx build --platform "$PLATFORM" -t "$inference_repo:$TAG" --push ./inference-service
 
 echo "Forcing ECS deployment..."
 cluster="$(aws --profile "$PROFILE" --region "$REGION" cloudformation describe-stacks \

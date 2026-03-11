@@ -12,12 +12,12 @@ Parameters:
     Description: Container port exposed by the Spring app.
   EcsAmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
-    Default: /aws/service/ecs/optimized-ami/amazon-linux-2/arm64/recommended/image_id
-    Description: ECS-optimized AMI for EC2 container instances.
+    Default: /aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id
+    Description: ECS-optimized x86_64 AMI for EC2 container instances.
   EcsInstanceType:
     Type: String
-    Default: t4g.micro
-    Description: EC2 instance type for the ECS cluster.
+    Default: t3.medium
+    Description: EC2 instance type for the ECS cluster. Sized for Spring plus the PyTorch sidecar.
   EcsDesiredCapacity:
     Type: Number
     Default: 1

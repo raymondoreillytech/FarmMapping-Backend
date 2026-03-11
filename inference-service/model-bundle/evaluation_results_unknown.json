@@ -1,0 +1,185 @@
+{
+  "settings": {
+    "test_mode": "land-only",
+    "skip_val": false,
+    "unknown_confidence_threshold": 0.75
+  },
+  "results": {
+    "val_land": {
+      "accuracy": 0.918918918918919,
+      "per_class_accuracy": {
+        "alder": null,
+        "ash": null,
+        "atlas_cedar": null,
+        "maritime_pine": 1.0,
+        "med_cypress": null,
+        "medronheiro": null,
+        "oak": 0.8571428571428571,
+        "olive": null,
+        "stone_pine": null,
+        "white_willow": null
+      },
+      "per_class_count": {
+        "alder": 0,
+        "ash": 0,
+        "atlas_cedar": 0,
+        "maritime_pine": 16,
+        "med_cypress": 0,
+        "medronheiro": 0,
+        "oak": 21,
+        "olive": 0,
+        "stone_pine": 0,
+        "white_willow": 0
+      },
+      "confusion_matrix": {
+        "maritime_pine": {
+          "maritime_pine": 16
+        },
+        "oak": {
+          "oak": 18,
+          "unknown": 2,
+          "alder": 1
+        }
+      },
+      "total_samples": 37,
+      "unknown_predictions": 2,
+      "unknown_rate": 0.05405405405405406,
+      "mean_top2_margin": 0.915090799331665,
+      "unknown_rejection": {
+        "enabled": true,
+        "confidence_threshold": 0.75
+      }
+    },
+    "test_land": {
+      "accuracy": 1.0,
+      "per_class_accuracy": {
+        "alder": null,
+        "ash": null,
+        "atlas_cedar": null,
+        "maritime_pine": 1.0,
+        "med_cypress": null,
+        "medronheiro": null,
+        "oak": 1.0,
+        "olive": null,
+        "stone_pine": null,
+        "white_willow": null
+      },
+      "per_class_count": {
+        "alder": 0,
+        "ash": 0,
+        "atlas_cedar": 0,
+        "maritime_pine": 11,
+        "med_cypress": 0,
+        "medronheiro": 0,
+        "oak": 19,
+        "olive": 0,
+        "stone_pine": 0,
+        "white_willow": 0
+      },
+      "confusion_matrix": {
+        "maritime_pine": {
+          "maritime_pine": 11
+        },
+        "oak": {
+          "oak": 19
+        }
+      },
+      "total_samples": 30,
+      "unknown_predictions": 0,
+      "unknown_rate": 0.0,
+      "mean_top2_margin": 0.948051393032074,
+      "unknown_rejection": {
+        "enabled": true,
+        "confidence_threshold": 0.75
+      }
+    },
+    "val_combined": {
+      "accuracy": 0.918918918918919,
+      "per_class_accuracy": {
+        "alder": null,
+        "ash": null,
+        "atlas_cedar": null,
+        "maritime_pine": 1.0,
+        "med_cypress": null,
+        "medronheiro": null,
+        "oak": 0.8571428571428571,
+        "olive": null,
+        "stone_pine": null,
+        "white_willow": null
+      },
+      "per_class_count": {
+        "alder": 0,
+        "ash": 0,
+        "atlas_cedar": 0,
+        "maritime_pine": 16,
+        "med_cypress": 0,
+        "medronheiro": 0,
+        "oak": 21,
+        "olive": 0,
+        "stone_pine": 0,
+        "white_willow": 0
+      },
+      "confusion_matrix": {
+        "maritime_pine": {
+          "maritime_pine": 16
+        },
+        "oak": {
+          "oak": 18,
+          "unknown": 2,
+          "alder": 1
+        }
+      },
+      "total_samples": 37,
+      "unknown_predictions": 2,
+      "unknown_rate": 0.05405405405405406,
+      "mean_top2_margin": 0.915090799331665,
+      "unknown_rejection": {
+        "enabled": true,
+        "confidence_threshold": 0.75
+      }
+    },
+    "test_combined": {
+      "accuracy": 1.0,
+      "per_class_accuracy": {
+        "alder": null,
+        "ash": null,
+        "atlas_cedar": null,
+        "maritime_pine": 1.0,
+        "med_cypress": null,
+        "medronheiro": null,
+        "oak": 1.0,
+        "olive": null,
+        "stone_pine": null,
+        "white_willow": null
+      },
+      "per_class_count": {
+        "alder": 0,
+        "ash": 0,
+        "atlas_cedar": 0,
+        "maritime_pine": 11,
+        "med_cypress": 0,
+        "medronheiro": 0,
+        "oak": 19,
+        "olive": 0,
+        "stone_pine": 0,
+        "white_willow": 0
+      },
+      "confusion_matrix": {
+        "maritime_pine": {
+          "maritime_pine": 11
+        },
+        "oak": {
+          "oak": 19
+        }
+      },
+      "total_samples": 30,
+      "unknown_predictions": 0,
+      "unknown_rate": 0.0,
+      "mean_top2_margin": 0.948051393032074,
+      "unknown_rejection": {
+        "enabled": true,
+        "confidence_threshold": 0.75
+      }
+    }
+  }
+}

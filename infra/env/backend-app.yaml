@@ -10,26 +10,38 @@ Parameters:
     Type: String
     Default: latest
     Description: ECR image tag for the backend container.
+  InferenceImageTag:
+    Type: String
+    Default: latest
+    Description: ECR image tag for the inference sidecar container.
   EcrRepositoryName:
     Type: String
     Default: farmmapping-backend
     Description: ECR repository name for the backend image.
+  InferenceEcrRepositoryName:
+    Type: String
+    Default: farmmapping-inference
+    Description: ECR repository name for the inference image.
   ContainerPort:
     Type: Number
     Default: 8080
     Description: Container port exposed by the Spring app.
+  InferenceContainerPort:
+    Type: Number
+    Default: 8000
+    Description: Container port exposed by the inference sidecar.
   AppDesiredCount:
     Type: Number
     Default: 0
     Description: Number of running tasks.
   AppCpu:
     Type: String
-    Default: "256"
-    Description: Task CPU units.
+    Default: "1024"
+    Description: Task CPU units for the combined app and inference task.
   AppMemory:
     Type: String
-    Default: "512"
-    Description: Task memory (MiB).
+    Default: "2048"
+    Description: Task memory (MiB) for the combined app and inference task.
   HealthCheckGracePeriodSeconds:
     Type: Number
     Default: 300
@@ -44,6 +56,31 @@ Resources:
     Type: AWS::ECR::Repository
     Properties:
       RepositoryName: !Ref EcrRepositoryName
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Retain only the last 5 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  InferenceEcrRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref InferenceEcrRepositoryName
       ImageScanningConfiguration:
         ScanOnPush: true
       LifecyclePolicy:
@@ -112,8 +149,31 @@ Resources:
       Memory: !Ref AppMemory
       ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
       ContainerDefinitions:
+        - Name: inference
+          Image: !Sub "${InferenceEcrRepository.RepositoryUri}:${InferenceImageTag}"
+          Essential: true
+          PortMappings:
+            - ContainerPort: !Ref InferenceContainerPort
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - python -c "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health').read()" || exit 1
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref AppLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: inference
         - Name: app
           Image: !Sub "${EcrRepository.RepositoryUri}:${AppImageTag}"
+          Essential: true
+          DependsOn:
+            - ContainerName: inference
+              Condition: HEALTHY
           PortMappings:
             - ContainerPort: !Ref ContainerPort
           Environment:
@@ -128,6 +188,8 @@ Resources:
                     Fn::Sub: "${AppName}-db-name"
             - Name: TILES_BASE_URL
               Value: /tiles
+            - Name: TREE_INFERENCE_BASE_URL
+              Value: !Sub "http://127.0.0.1:${InferenceContainerPort}"
           Secrets:
             - Name: SPRING_DATASOURCE_USERNAME
               ValueFrom: !ImportValue
@@ -175,6 +237,10 @@ Outputs:
     Value: !GetAtt EcrRepository.RepositoryUri
     Export:
       Name: !Sub "${AppName}-ecr-repo-uri"
+  InferenceEcrRepositoryUri:
+    Value: !GetAtt InferenceEcrRepository.RepositoryUri
+    Export:
+      Name: !Sub "${AppName}-inference-ecr-repo-uri"
   EcsServiceName:
     Value: !Ref AppService
     Export:

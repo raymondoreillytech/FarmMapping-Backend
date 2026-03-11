@@ -16,12 +16,32 @@ services:
       timeout: 3s
       retries: 20
 
+  inference:
+    build:
+      context: ./inference-service
+    container_name: farmmapping-inference
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health').read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   app:
     build: .
     depends_on:
       infra:
         condition: service_completed_successfully
       db:
+        condition: service_healthy
+      inference:
         condition: service_healthy
     container_name: farmmapping-app
     ports:
@@ -38,6 +58,7 @@ services:
       - AWS_DEFAULT_REGION=eu-west-1
       - AWS_REGION=eu-west-1
       - LOCALSTACK_ENDPOINT=http://localstack:4566
+      - TREE_INFERENCE_BASE_URL=http://inference:8000
     volumes:
       - ./data/photos:/app/data/photos
 

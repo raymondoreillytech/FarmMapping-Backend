@@ -1,0 +1,16 @@
+{
+  "backbone": "resnet34",
+  "num_classes": 10,
+  "class_names": [
+    "alder",
+    "ash",
+    "atlas_cedar",
+    "maritime_pine",
+    "med_cypress",
+    "medronheiro",
+    "oak",
+    "olive",
+    "stone_pine",
+    "white_willow"
+  ]
+}
