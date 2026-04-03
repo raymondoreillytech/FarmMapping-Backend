@@ -6,7 +6,7 @@ REGION="${AWS_REGION:-eu-west-1}"
 STACK_NAME="${STACK_NAME:-farmmapping-icons-prod}"
 CLOUDFRONT_STACK="${CLOUDFRONT_STACK:-farmmapping-cloudfront-prod}"
 BUCKET="${BUCKET:-}"
-ICONS_DIR="${ICONS_DIR:-static/icons}"
+ICONS_DIR="${ICONS_DIR:-src/main/resources/static/icons}"
 S3_PREFIX="${S3_PREFIX:-icons}"
 INVALIDATE_CLOUDFRONT="${INVALIDATE_CLOUDFRONT:-true}"
 

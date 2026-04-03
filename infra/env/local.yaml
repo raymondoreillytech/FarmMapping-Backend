@@ -4,6 +4,9 @@ Parameters:
   MapTilesBucketName:
     Type: String
     Description: Name of the map tiles S3 bucket.
+  TreePhotoBucketName:
+    Type: String
+    Description: Name of the tree observation photo S3 bucket.
   EnableMapTilesVersioning:
     Type: String
     AllowedValues:
@@ -42,8 +45,21 @@ Resources:
           Value: local
         - Key: Purpose
           Value: map-tiles
+  TreePhotoBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref TreePhotoBucketName
+      Tags:
+        - Key: Environment
+          Value: local
+        - Key: Purpose
+          Value: tree-photos
 Outputs:
   MapTilesBucketName:
     Value: !Ref MapTilesBucket
   MapTilesBucketArn:
     Value: !GetAtt MapTilesBucket.Arn
+  TreePhotoBucketName:
+    Value: !Ref TreePhotoBucket
+  TreePhotoBucketArn:
+    Value: !GetAtt TreePhotoBucket.Arn

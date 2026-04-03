@@ -17,13 +17,6 @@ Parameters:
       - "false"
     Default: "true"
     Description: Create bucket policy after CloudFront stack exists.
-  EnableIconsVersioning:
-    Type: String
-    AllowedValues:
-      - "true"
-      - "false"
-    Default: "true"
-    Description: Enable S3 versioning for icons.
   BlockIconsPublicAccess:
     Type: String
     AllowedValues:
@@ -33,7 +26,6 @@ Parameters:
     Description: Block all public access to the icons bucket.
 
 Conditions:
-  IconsVersioningEnabled: !Equals [!Ref EnableIconsVersioning, "true"]
   IconsBlockPublicAccessEnabled: !Equals [!Ref BlockIconsPublicAccess, "true"]
   BucketPolicyEnabled: !Equals [!Ref CreateBucketPolicy, "true"]
 
@@ -44,10 +36,8 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       BucketName: !Ref IconsBucketName
-      VersioningConfiguration: !If
-        - IconsVersioningEnabled
-        - Status: Enabled
-        - !Ref "AWS::NoValue"
+      VersioningConfiguration:
+        Status: Suspended
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:

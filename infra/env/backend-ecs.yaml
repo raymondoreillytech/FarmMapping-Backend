@@ -20,7 +20,7 @@ Parameters:
     Description: EC2 instance type for the ECS cluster. Sized for Spring plus the PyTorch sidecar.
   EcsDesiredCapacity:
     Type: Number
-    Default: 1
+    Default: 0
     Description: Number of ECS instances.
 
 Resources:

@@ -13,7 +13,7 @@ import java.io.IOException;
 @ConfigurationPropertiesScan
 public class FarmMappingApplication {
 
-    static void main(String[] args) throws IOException, ImageProcessingException {
+    public static void main(String[] args) throws IOException, ImageProcessingException {
 
         SpringApplication.run(FarmMappingApplication.class, args);
 

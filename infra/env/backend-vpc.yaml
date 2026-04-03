@@ -12,8 +12,19 @@ Parameters:
   PublicSubnetIds:
     Type: List<AWS::EC2::Subnet::Id>
     Description: Default VPC public subnet ids.
+  PublicRouteTableIds:
+    Type: List<String>
+    Description: Route table ids used by the public subnets.
 
 Resources:
+  S3GatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcEndpointType: Gateway
+      VpcId: !Ref VpcId
+      RouteTableIds: !Ref PublicRouteTableIds
+
   VpcExportsHandle:
     Type: AWS::CloudFormation::WaitConditionHandle
 
@@ -26,3 +37,7 @@ Outputs:
     Value: !Join [",", !Ref PublicSubnetIds]
     Export:
       Name: !Sub "${AppName}-public-subnet-ids"
+  S3GatewayEndpointId:
+    Value: !Ref S3GatewayEndpoint
+    Export:
+      Name: !Sub "${AppName}-s3-gateway-endpoint-id"

@@ -1,18 +1,16 @@
 package com.ray.farm.mapping.controller.model;
 
-import com.ray.farm.mapping.entity.ObservationEntity;
-import com.ray.farm.mapping.model.TreeSpecies;
+import com.ray.farm.mapping.entity.TreeEntity;
 
 public record LeafletObservationDTO(long id, double lat, double lon, String iconKey, String label) {
 
-    public static LeafletObservationDTO fromEntity(ObservationEntity e) {
-        var species = TreeSpecies.valueOf(e.getTreeSpecies());
+    public static LeafletObservationDTO fromEntity(TreeEntity tree) {
         return new LeafletObservationDTO(
-                e.getId(),
-                e.getLocation().getY(), // lat
-                e.getLocation().getX(), // lon
-                species.iconKey(),
-                species.name()
+                tree.getId(),
+                tree.getLocation().getY(),
+                tree.getLocation().getX(),
+                tree.getConfirmedSpecies().getIconKey(),
+                tree.getConfirmedSpecies().getDisplayName()
         );
     }
 

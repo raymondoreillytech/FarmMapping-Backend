@@ -6,5 +6,9 @@
   {
     "ParameterKey": "PublicSubnetIds",
     "ParameterValue": "subnet-0688389cc47edc171,subnet-076916facf563ccf2,subnet-04ee89fec91c3c67d"
+  },
+  {
+    "ParameterKey": "PublicRouteTableIds",
+    "ParameterValue": "rtb-032f8b021b044f4e1"
   }
 ]

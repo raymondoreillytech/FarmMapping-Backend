@@ -4,6 +4,10 @@
     "ParameterValue": "farmmapping-map-tiles-local"
   },
   {
+    "ParameterKey": "TreePhotoBucketName",
+    "ParameterValue": "farmmapping-tree-observation-local"
+  },
+  {
     "ParameterKey": "EnableMapTilesVersioning",
     "ParameterValue": "false"
   },

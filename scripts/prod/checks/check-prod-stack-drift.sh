@@ -7,6 +7,7 @@ REGION="${AWS_REGION:-eu-west-1}"
 STACKS=(
   farmmapping-s3-prod
   farmmapping-cloudfront-prod
+  farmmapping-icons-prod
   farmmapping-backend-vpc
   farmmapping-backend-alb
   farmmapping-backend-ecs

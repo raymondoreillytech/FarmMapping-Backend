@@ -20,7 +20,6 @@ spring:
 
   servlet:
     multipart:
-      # Use environment variables for upload limits
       max-file-size: ${MAX_FILE_SIZE:20MB}
       max-request-size: ${MAX_REQUEST_SIZE:20MB}
 
@@ -30,12 +29,19 @@ server:
 
 app:
   storage:
-    photos-dir: ${PHOTOS_DIR:./data/photos}
+    s3:
+      bucket-name: ${TREE_PHOTO_S3_BUCKET:farmmapping-tree-observation}
+      key-prefix: ${TREE_PHOTO_S3_KEY_PREFIX:trees}
+      region: ${TREE_PHOTO_S3_REGION:${AWS_REGION:eu-west-1}}
+      endpoint: ${TREE_PHOTO_S3_ENDPOINT:}
+      force-path-style: ${TREE_PHOTO_S3_FORCE_PATH_STYLE:false}
+      download-url-ttl: ${TREE_PHOTO_S3_DOWNLOAD_URL_TTL:15m}
   tiles:
     base-url: ${TILES_BASE_URL:http://localhost:4566/farmmapping-map-tiles-local}
-  # Moving hardcoded tree species to configuration
-  business-rules:
-    allowed-species: ${ALLOWED_SPECIES:PINE,OAK,PLANE,PRICKLY_PEAR_CACTUS,EUCALYPTUS}
+  inference:
+    base-url: ${TREE_INFERENCE_BASE_URL:http://localhost:8000}
+    connect-timeout: ${TREE_INFERENCE_CONNECT_TIMEOUT:5s}
+    read-timeout: ${TREE_INFERENCE_READ_TIMEOUT:30s}
 
 logging:
   level:

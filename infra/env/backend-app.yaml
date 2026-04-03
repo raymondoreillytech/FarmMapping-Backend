@@ -50,6 +50,14 @@ Parameters:
     Type: Number
     Default: 1
     Description: CloudWatch log retention in days.
+  TreePhotoBucketName:
+    Type: String
+    Default: farmmapping-tree-observation
+    Description: S3 bucket used for uploaded tree observation photos.
+  TreePhotoKeyPrefix:
+    Type: String
+    Default: trees
+    Description: S3 key prefix used for uploaded tree observation photos.
 
 Resources:
   EcrRepository:
@@ -121,7 +129,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       Policies:
-        - PolicyName: ssm-parameter-read
+        - PolicyName: task-definition-secret-read
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -133,10 +141,22 @@ Resources:
                     - "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${DbUsernameParam}"
                     - DbUsernameParam: !ImportValue
                         Fn::Sub: "${AppName}-db-username-param"
-                  - !Sub
-                    - "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${DbPasswordParam}"
-                    - DbPasswordParam: !ImportValue
-                        Fn::Sub: "${AppName}-db-password-param"
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !ImportValue
+                    Fn::Sub: "${AppName}-db-password-secret-arn"
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub "arn:aws:s3:::${TreePhotoBucketName}"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub "arn:aws:s3:::${TreePhotoBucketName}/${TreePhotoKeyPrefix}/*"
 
   AppTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -148,6 +168,7 @@ Resources:
       Cpu: !Ref AppCpu
       Memory: !Ref AppMemory
       ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskExecutionRole.Arn
       ContainerDefinitions:
         - Name: inference
           Image: !Sub "${InferenceEcrRepository.RepositoryUri}:${InferenceImageTag}"
@@ -188,6 +209,12 @@ Resources:
                     Fn::Sub: "${AppName}-db-name"
             - Name: TILES_BASE_URL
               Value: /tiles
+            - Name: TREE_PHOTO_S3_BUCKET
+              Value: !Ref TreePhotoBucketName
+            - Name: TREE_PHOTO_S3_KEY_PREFIX
+              Value: !Ref TreePhotoKeyPrefix
+            - Name: TREE_PHOTO_S3_REGION
+              Value: !Ref AWS::Region
             - Name: TREE_INFERENCE_BASE_URL
               Value: !Sub "http://127.0.0.1:${InferenceContainerPort}"
           Secrets:
@@ -196,7 +223,7 @@ Resources:
                 Fn::Sub: "${AppName}-db-username-param"
             - Name: SPRING_DATASOURCE_PASSWORD
               ValueFrom: !ImportValue
-                Fn::Sub: "${AppName}-db-password-param"
+                Fn::Sub: "${AppName}-db-password-secret-arn"
           LogConfiguration:
             LogDriver: awslogs
             Options:

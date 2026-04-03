@@ -1,3 +1,5 @@
 app:
   storage:
-    photos-dir: src/test/resources/test-tree-photos
+    s3:
+      bucket-name: test-tree-photo-bucket
+      region: eu-west-1

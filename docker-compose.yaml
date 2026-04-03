@@ -58,6 +58,9 @@ services:
       - AWS_DEFAULT_REGION=eu-west-1
       - AWS_REGION=eu-west-1
       - LOCALSTACK_ENDPOINT=http://localstack:4566
+      - TREE_PHOTO_S3_BUCKET=farmmapping-tree-observation-local
+      - TREE_PHOTO_S3_ENDPOINT=http://localstack:4566
+      - TREE_PHOTO_S3_FORCE_PATH_STYLE=true
       - TREE_INFERENCE_BASE_URL=http://inference:8000
     volumes:
       - ./data/photos:/app/data/photos

@@ -82,12 +82,12 @@ Resources:
       Type: String
       Value: !Ref DbUsername
 
-  DbPasswordParameter:
-    Type: AWS::SSM::Parameter
+  DbPasswordSecret:
+    Type: AWS::SecretsManager::Secret
     Properties:
       Name: !Sub "/${AppName}/db/password"
-      Type: String
-      Value: !Ref DbPassword
+      Description: !Sub "Master password for ${AppName} Postgres"
+      SecretString: !Ref DbPassword
 
 Outputs:
   DbEndpoint:
@@ -110,7 +110,7 @@ Outputs:
     Value: !Ref DbUsernameParameter
     Export:
       Name: !Sub "${AppName}-db-username-param"
-  DbPasswordParameterName:
-    Value: !Ref DbPasswordParameter
+  DbPasswordSecretArn:
+    Value: !Ref DbPasswordSecret
     Export:
-      Name: !Sub "${AppName}-db-password-param"
+      Name: !Sub "${AppName}-db-password-secret-arn"
