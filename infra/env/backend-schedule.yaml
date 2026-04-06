@@ -70,7 +70,29 @@ Resources:
       Code:
         ZipFile: |
           import boto3
+          import logging
           import os
+          from botocore.exceptions import ClientError
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def stop_db_instance(rds, db_id):
+              try:
+                  response = rds.stop_db_instance(DBInstanceIdentifier=db_id)
+              except ClientError as exc:
+                  error_code = exc.response.get("Error", {}).get("Code")
+                  if error_code == "InvalidDBInstanceState":
+                      logger.info(
+                          "RDS instance %s is already not in an available state; treating as stopped.",
+                          db_id,
+                      )
+                      return "already-stopped"
+                  raise
+
+              status = response.get("DBInstance", {}).get("DBInstanceStatus", "unknown")
+              logger.info("RDS instance %s stop requested; status=%s", db_id, status)
+              return status
 
           def handler(event, context):
               ecs = boto3.client("ecs")
@@ -83,15 +105,17 @@ Resources:
               db_id = os.environ["DB_INSTANCE_ID"]
 
               ecs.update_service(cluster=cluster, service=service, desiredCount=0)
+              logger.info("Set ECS service %s desired count to 0.", service)
               asg.update_auto_scaling_group(
                   AutoScalingGroupName=asg_name,
                   MinSize=0,
                   MaxSize=0,
                   DesiredCapacity=0,
               )
-              rds.stop_db_instance(DBInstanceIdentifier=db_id)
+              logger.info("Set ASG %s capacity to 0.", asg_name)
+              db_status = stop_db_instance(rds, db_id)
 
-              return {"status": "stopped"}
+              return {"status": "stopped", "dbStatus": db_status}
 
   StopScheduleRule:
     Type: AWS::Events::Rule

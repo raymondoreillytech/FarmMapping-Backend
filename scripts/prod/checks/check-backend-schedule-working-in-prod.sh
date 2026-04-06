@@ -7,6 +7,11 @@ SCHEDULE_STACK="${SCHEDULE_STACK:-farmmapping-backend-schedule}"
 HOURS="${HOURS:-168}"
 METRIC_PERIOD="${METRIC_PERIOD:-3600}"
 
+# Prevent Git Bash on Windows from rewriting CloudWatch log groups like /aws/lambda/...
+if [[ -n "${MSYSTEM:-}" ]]; then
+  export MSYS_NO_PATHCONV=1
+fi
+
 get_output() {
   local stack="$1"
   local key="$2"
