@@ -40,7 +40,7 @@ Parameters:
     Description: Task CPU units for the combined app and inference task.
   AppMemory:
     Type: String
-    Default: "2048"
+    Default: "1536"
     Description: Task memory (MiB) for the combined app and inference task.
   HealthCheckGracePeriodSeconds:
     Type: Number

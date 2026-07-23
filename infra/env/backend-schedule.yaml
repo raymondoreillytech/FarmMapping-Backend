@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Scheduled stop for ECS/ASG/RDS to reduce costs.
+Description: Scheduled start/stop for ECS/ASG/RDS to reduce costs.
 
 Parameters:
   AppName:
@@ -8,8 +8,16 @@ Parameters:
     Description: Prefix for exported names.
   StopScheduleExpression:
     Type: String
-    Default: cron(0 0 * * ? *)
+    Default: cron(0 22 * * ? *)
     Description: Cron expression for stop time (UTC by default).
+  StartDbScheduleExpression:
+    Type: String
+    Default: cron(0 7 * * ? *)
+    Description: Cron expression for RDS start time (UTC by default).
+  StartComputeScheduleExpression:
+    Type: String
+    Default: cron(20 7 * * ? *)
+    Description: Cron expression for ECS/ASG start time (UTC by default).
 
 Resources:
   StopperRole:
@@ -25,7 +33,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
-        - PolicyName: stop-backend-resources
+        - PolicyName: manage-backend-resources
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -43,6 +51,7 @@ Resources:
                       Fn::Sub: "${AppName}-ecs-asg-name"
               - Effect: Allow
                 Action:
+                  - rds:StartDBInstance
                   - rds:StopDBInstance
                 Resource: !Sub
                   - "arn:aws:rds:${AWS::Region}:${AWS::AccountId}:db:${DbId}"
@@ -117,14 +126,112 @@ Resources:
 
               return {"status": "stopped", "dbStatus": db_status}
 
+  StarterFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AppName}-starter"
+      Role: !GetAtt StopperRole.Arn
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 60
+      Environment:
+        Variables:
+          ECS_CLUSTER: !ImportValue
+            Fn::Sub: "${AppName}-ecs-cluster-name"
+          ECS_SERVICE: !ImportValue
+            Fn::Sub: "${AppName}-ecs-service-name"
+          ASG_NAME: !ImportValue
+            Fn::Sub: "${AppName}-ecs-asg-name"
+          DB_INSTANCE_ID: !ImportValue
+            Fn::Sub: "${AppName}-db-instance-id"
+      Code:
+        ZipFile: |
+          import boto3
+          import logging
+          import os
+          from botocore.exceptions import ClientError
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def start_db_instance(rds, db_id):
+              try:
+                  response = rds.start_db_instance(DBInstanceIdentifier=db_id)
+              except ClientError as exc:
+                  error_code = exc.response.get("Error", {}).get("Code")
+                  if error_code == "InvalidDBInstanceState":
+                      logger.info(
+                          "RDS instance %s is already not in a stopped state; treating as started.",
+                          db_id,
+                      )
+                      return "already-started"
+                  raise
+
+              status = response.get("DBInstance", {}).get("DBInstanceStatus", "unknown")
+              logger.info("RDS instance %s start requested; status=%s", db_id, status)
+              return status
+
+          def start_compute(ecs, asg, cluster, service, asg_name):
+              asg.update_auto_scaling_group(
+                  AutoScalingGroupName=asg_name,
+                  MinSize=1,
+                  MaxSize=1,
+                  DesiredCapacity=1,
+              )
+              logger.info("Set ASG %s capacity to 1.", asg_name)
+              ecs.update_service(cluster=cluster, service=service, desiredCount=1)
+              logger.info("Set ECS service %s desired count to 1.", service)
+
+          def handler(event, context):
+              action = event.get("action", "start-all")
+              ecs = boto3.client("ecs")
+              asg = boto3.client("autoscaling")
+              rds = boto3.client("rds")
+
+              cluster = os.environ["ECS_CLUSTER"]
+              service = os.environ["ECS_SERVICE"]
+              asg_name = os.environ["ASG_NAME"]
+              db_id = os.environ["DB_INSTANCE_ID"]
+
+              result = {"status": "started", "action": action}
+              if action in ("start-db", "start-all"):
+                  result["dbStatus"] = start_db_instance(rds, db_id)
+              if action in ("start-compute", "start-all"):
+                  start_compute(ecs, asg, cluster, service, asg_name)
+                  result["computeStatus"] = "requested"
+              return result
+
   StopScheduleRule:
     Type: AWS::Events::Rule
     Properties:
+      Description: Stops backend ECS/ASG/RDS at the configured time.
       ScheduleExpression: !Ref StopScheduleExpression
       State: ENABLED
       Targets:
         - Arn: !GetAtt StopperFunction.Arn
           Id: StopperFunction
+
+  StartDbScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Starts backend RDS before compute starts.
+      ScheduleExpression: !Ref StartDbScheduleExpression
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StarterFunction.Arn
+          Id: StartDbFunction
+          Input: '{"action":"start-db"}'
+
+  StartComputeScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Starts backend ECS/ASG after RDS has had time to start.
+      ScheduleExpression: !Ref StartComputeScheduleExpression
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StarterFunction.Arn
+          Id: StartComputeFunction
+          Input: '{"action":"start-compute"}'
 
   AllowEventsInvoke:
     Type: AWS::Lambda::Permission
@@ -134,8 +241,30 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt StopScheduleRule.Arn
 
+  AllowStartDbEventsInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StarterFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StartDbScheduleRule.Arn
+
+  AllowStartComputeEventsInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StarterFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StartComputeScheduleRule.Arn
+
 Outputs:
   StopperFunctionName:
     Value: !Ref StopperFunction
   StopScheduleRuleArn:
     Value: !GetAtt StopScheduleRule.Arn
+  StarterFunctionName:
+    Value: !Ref StarterFunction
+  StartDbScheduleRuleArn:
+    Value: !GetAtt StartDbScheduleRule.Arn
+  StartComputeScheduleRuleArn:
+    Value: !GetAtt StartComputeScheduleRule.Arn

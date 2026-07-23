@@ -121,20 +121,37 @@ if ! aws --profile "$PROFILE" --region "$REGION" sts get-caller-identity >/dev/n
   exit 2
 fi
 
-function_name="${STOPPER_FUNCTION_NAME:-$(get_output "$SCHEDULE_STACK" StopperFunctionName)}"
-rule_arn="${STOP_SCHEDULE_RULE_ARN:-$(get_output "$SCHEDULE_STACK" StopScheduleRuleArn)}"
+stopper_function_name="${STOPPER_FUNCTION_NAME:-$(get_output "$SCHEDULE_STACK" StopperFunctionName)}"
+starter_function_name="${STARTER_FUNCTION_NAME:-$(get_output "$SCHEDULE_STACK" StarterFunctionName)}"
+stop_rule_arn="${STOP_SCHEDULE_RULE_ARN:-$(get_output "$SCHEDULE_STACK" StopScheduleRuleArn)}"
+start_db_rule_arn="${START_DB_SCHEDULE_RULE_ARN:-$(get_output "$SCHEDULE_STACK" StartDbScheduleRuleArn)}"
+start_compute_rule_arn="${START_COMPUTE_SCHEDULE_RULE_ARN:-$(get_output "$SCHEDULE_STACK" StartComputeScheduleRuleArn)}"
 
-if [[ -z "$function_name" || "$function_name" == "None" ]]; then
+if [[ -z "$stopper_function_name" || "$stopper_function_name" == "None" ]]; then
   echo "Could not resolve StopperFunctionName from stack $SCHEDULE_STACK."
   exit 1
 fi
 
-if [[ -z "$rule_arn" || "$rule_arn" == "None" ]]; then
+if [[ -z "$starter_function_name" || "$starter_function_name" == "None" ]]; then
+  echo "Could not resolve StarterFunctionName from stack $SCHEDULE_STACK."
+  exit 1
+fi
+
+if [[ -z "$stop_rule_arn" || "$stop_rule_arn" == "None" ]]; then
   echo "Could not resolve StopScheduleRuleArn from stack $SCHEDULE_STACK."
   exit 1
 fi
 
-rule_name="${EVENT_RULE_NAME:-${rule_arn##*/}}"
+if [[ -z "$start_db_rule_arn" || "$start_db_rule_arn" == "None" ]]; then
+  echo "Could not resolve StartDbScheduleRuleArn from stack $SCHEDULE_STACK."
+  exit 1
+fi
+
+if [[ -z "$start_compute_rule_arn" || "$start_compute_rule_arn" == "None" ]]; then
+  echo "Could not resolve StartComputeScheduleRuleArn from stack $SCHEDULE_STACK."
+  exit 1
+fi
+
 start_time="$(utc_hours_ago "$HOURS")"
 end_time="$(utc_now)"
 
@@ -143,84 +160,121 @@ if [[ -z "$start_time" || -z "$end_time" ]]; then
   exit 2
 fi
 
-rule_state="$(aws --profile "$PROFILE" --region "$REGION" events describe-rule \
-  --name "$rule_name" \
-  --query "State" \
-  --output text 2>/dev/null || true)"
-
-target_count="$(aws --profile "$PROFILE" --region "$REGION" events list-targets-by-rule \
-  --rule "$rule_name" \
-  --query "length(Targets[?contains(Arn, '$function_name')])" \
-  --output text 2>/dev/null || true)"
-
-events_invocations="$(metric_sum "AWS/Events" "Invocations" "RuleName" "$rule_name" "$start_time" "$end_time")"
-events_failed="$(metric_sum "AWS/Events" "FailedInvocations" "RuleName" "$rule_name" "$start_time" "$end_time")"
-lambda_invocations="$(metric_sum "AWS/Lambda" "Invocations" "FunctionName" "$function_name" "$start_time" "$end_time")"
-lambda_errors="$(metric_sum "AWS/Lambda" "Errors" "FunctionName" "$function_name" "$start_time" "$end_time")"
-
 echo "Schedule stack : $SCHEDULE_STACK"
-echo "Rule name      : $rule_name"
-echo "Lambda name    : $function_name"
 echo "Window (UTC)   : $start_time -> $end_time"
-echo
-echo "EventBridge rule state      : ${rule_state:-UNKNOWN}"
-echo "Lambda target wired         : ${target_count:-0}"
-echo "EventBridge invocations     : $events_invocations"
-echo "EventBridge failed invoke   : $events_failed"
-echo "Lambda invocations          : $lambda_invocations"
-echo "Lambda errors               : $lambda_errors"
-
-log_group="/aws/lambda/$function_name"
-last_event_ms="$(aws --profile "$PROFILE" --region "$REGION" logs describe-log-streams \
-  --log-group-name "$log_group" \
-  --order-by LastEventTime \
-  --descending \
-  --limit 1 \
-  --query "logStreams[0].lastEventTimestamp" \
-  --output text 2>/dev/null || true)"
-
-if [[ -n "$last_event_ms" && "$last_event_ms" != "None" ]]; then
-  echo "Last lambda log event (UTC) : $(epoch_ms_to_iso_utc "$last_event_ms")"
-else
-  echo "Last lambda log event (UTC) : none"
-fi
 
 fail=0
 
-if [[ "$rule_state" != "ENABLED" ]]; then
-  echo "FAIL: EventBridge rule is not ENABLED."
-  fail=1
-fi
+check_rule() {
+  local label="$1"
+  local rule_arn="$2"
+  local function_name="$3"
+  local rule_name="${rule_arn##*/}"
+  local rule_state
+  local schedule
+  local target_count
+  local events_invocations
+  local events_failed
 
-if [[ -z "$target_count" || "$target_count" == "None" || "$target_count" == "0" ]]; then
-  echo "FAIL: EventBridge rule is not targeting the stopper Lambda."
-  fail=1
-fi
+  rule_state="$(aws --profile "$PROFILE" --region "$REGION" events describe-rule \
+    --name "$rule_name" \
+    --query "State" \
+    --output text 2>/dev/null || true)"
 
-if [[ "$events_invocations" == "0" ]]; then
-  echo "FAIL: No EventBridge invocations in the last $HOURS hours."
-  fail=1
-fi
+  schedule="$(aws --profile "$PROFILE" --region "$REGION" events describe-rule \
+    --name "$rule_name" \
+    --query "ScheduleExpression" \
+    --output text 2>/dev/null || true)"
 
-if [[ "$lambda_invocations" == "0" ]]; then
-  echo "FAIL: No Lambda invocations in the last $HOURS hours."
-  fail=1
-fi
+  target_count="$(aws --profile "$PROFILE" --region "$REGION" events list-targets-by-rule \
+    --rule "$rule_name" \
+    --query "length(Targets[?contains(Arn, '$function_name')])" \
+    --output text 2>/dev/null || true)"
 
-if [[ "$events_failed" != "0" ]]; then
-  echo "FAIL: EventBridge has failed invocations."
-  fail=1
-fi
+  events_invocations="$(metric_sum "AWS/Events" "Invocations" "RuleName" "$rule_name" "$start_time" "$end_time")"
+  events_failed="$(metric_sum "AWS/Events" "FailedInvocations" "RuleName" "$rule_name" "$start_time" "$end_time")"
 
-if [[ "$lambda_errors" != "0" ]]; then
-  echo "FAIL: Stopper Lambda has errors."
-  fail=1
-fi
+  echo
+  echo "$label rule"
+  echo "  name                  : $rule_name"
+  echo "  schedule              : ${schedule:-UNKNOWN}"
+  echo "  state                 : ${rule_state:-UNKNOWN}"
+  echo "  lambda target wired   : ${target_count:-0}"
+  echo "  EventBridge invokes   : $events_invocations"
+  echo "  failed invokes        : $events_failed"
+
+  if [[ "$rule_state" != "ENABLED" ]]; then
+    echo "  FAIL: EventBridge rule is not ENABLED."
+    fail=1
+  fi
+
+  if [[ -z "$target_count" || "$target_count" == "None" || "$target_count" == "0" ]]; then
+    echo "  FAIL: EventBridge rule is not targeting $function_name."
+    fail=1
+  fi
+
+  if [[ "$events_invocations" == "0" ]]; then
+    echo "  WARN: No EventBridge invocations in the last $HOURS hours."
+  fi
+
+  if [[ "$events_failed" != "0" ]]; then
+    echo "  FAIL: EventBridge has failed invocations."
+    fail=1
+  fi
+}
+
+check_lambda() {
+  local label="$1"
+  local function_name="$2"
+  local lambda_invocations
+  local lambda_errors
+  local log_group
+  local last_event_ms
+
+  lambda_invocations="$(metric_sum "AWS/Lambda" "Invocations" "FunctionName" "$function_name" "$start_time" "$end_time")"
+  lambda_errors="$(metric_sum "AWS/Lambda" "Errors" "FunctionName" "$function_name" "$start_time" "$end_time")"
+  log_group="/aws/lambda/$function_name"
+  last_event_ms="$(aws --profile "$PROFILE" --region "$REGION" logs describe-log-streams \
+    --log-group-name "$log_group" \
+    --order-by LastEventTime \
+    --descending \
+    --limit 1 \
+    --query "logStreams[0].lastEventTimestamp" \
+    --output text 2>/dev/null || true)"
+
+  echo
+  echo "$label lambda"
+  echo "  name                  : $function_name"
+  echo "  invocations           : $lambda_invocations"
+  echo "  errors                : $lambda_errors"
+  if [[ -n "$last_event_ms" && "$last_event_ms" != "None" ]]; then
+    echo "  last log event (UTC)  : $(epoch_ms_to_iso_utc "$last_event_ms")"
+  else
+    echo "  last log event (UTC)  : none"
+  fi
+
+  if [[ "$lambda_invocations" == "0" ]]; then
+    echo "  WARN: No Lambda invocations in the last $HOURS hours."
+  fi
+
+  if [[ "$lambda_errors" != "0" ]]; then
+    echo "  FAIL: Lambda has errors."
+    fail=1
+  fi
+}
+
+check_rule "Stop backend" "$stop_rule_arn" "$stopper_function_name"
+check_rule "Start database" "$start_db_rule_arn" "$starter_function_name"
+check_rule "Start compute" "$start_compute_rule_arn" "$starter_function_name"
+check_lambda "Stopper" "$stopper_function_name"
+check_lambda "Starter" "$starter_function_name"
 
 if [[ "$fail" -eq 0 ]]; then
-  echo "PASS: Schedule appears to be working."
+  echo
+  echo "PASS: Schedule rules are enabled and wired."
   exit 0
 fi
 
+echo
 echo "FAIL: Schedule is not healthy. Investigate EventBridge/Lambda logs."
 exit 1

@@ -23,6 +23,16 @@ spring:
       max-file-size: ${MAX_FILE_SIZE:20MB}
       max-request-size: ${MAX_REQUEST_SIZE:20MB}
 
+  ai:
+    model:
+      # Set SPRING_AI_CHAT_MODEL=openai after you configure OPENAI_API_KEY.
+      chat: ${SPRING_AI_CHAT_MODEL:disabled}
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      chat:
+        options:
+          model: ${OPENAI_CHAT_MODEL:gpt-5-mini}
+
 # Allow port configuration (critical for AWS App Runner or ECS)
 server:
   port: ${PORT:8080}

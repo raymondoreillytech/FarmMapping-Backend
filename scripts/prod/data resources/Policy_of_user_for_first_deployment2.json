@@ -37,6 +37,24 @@
         "secretsmanager:UpdateSecret"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "CostExplorer",
+      "Effect": "Allow",
+      "Action": [
+        "ce:GetCostAndUsage",
+        "ce:GetCostForecast",
+        "ce:GetTags"
+      ],
+      "Resource": "*"
+    },
+    {
+    "Sid": "ComputeOptimizer",
+    "Effect": "Allow",
+    "Action": [
+    "compute-optimizer:GetEC2InstanceRecommendations"
+    ],
+    "Resource": "*"
     }
   ]
 }
